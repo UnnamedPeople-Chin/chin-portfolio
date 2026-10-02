@@ -5794,26 +5794,40 @@
 
           if (MOBILE) {
             /* No fan on phones — the four project plates fade through, the
-               portrait plate (last in DOM order, so top of the pile) settles in
-               place and HOLDS, and the Continue button appears. Short on
-               purpose so a tap-through never feels like a stall, but the
-               entrance still ends on the profile rather than blinking straight
-               to the page. */
+               portrait plate (last in DOM order, so top of the pile) settles
+               in, holds a beat, then dissolves. What remains is the name and
+               the Continue button. Short on purpose so a tap-through never
+               feels like a stall, but the entrance still resolves rather than
+               blinking straight to the page. */
             plates.forEach(function (p, i) {
               if (i === plates.length - 1) {
-                /* the portrait plate: fade in and stay */
-                p.animate(
+                /* the portrait plate: fade in, hold long enough to read, then
+                   dissolve — so the entrance is left with just the name and
+                   the Continue button, not a held photograph. */
+                var portraitAnim = p.animate(
                   [
                     { opacity: 0, transform: "scale(0.96)" },
-                    { opacity: 1, transform: "scale(1)" },
+                    { opacity: 1, transform: "scale(1)", offset: 0.34 },
+                    { opacity: 1, transform: "scale(1)", offset: 0.62 },
+                    { opacity: 0, transform: "scale(1.03)" },
                   ],
                   {
-                    duration: 620,
+                    duration: 1500,
                     delay: i * 55,
-                    easing: "ease-out",
+                    easing: "ease-in-out",
                     fill: "forwards",
                   },
                 );
+                /* Offer Continue the moment the portrait has finished
+                   dissolving, not on the backstop timer; the timer stays as the
+                   stall guard (a cancelled animation rejects `finished`). */
+                if (portraitAnim && portraitAnim.finished) {
+                  portraitAnim.finished
+                    .then(function () {
+                      if (!ctl.closed) resolveIntro();
+                    })
+                    .catch(function () {});
+                }
                 return;
               }
               p.animate(
@@ -5847,7 +5861,7 @@
             backstop = setTimeout(function () {
               if (ctl.closed) return;
               resolveIntro();
-            }, 1250);
+            }, 1900);
             return;
           }
 
@@ -6789,13 +6803,10 @@
         ctl.ctl.onResize = onIntroResize;
         window.addEventListener("resize", onIntroResize);
 
-        /* 4. the stack resolves down to ONE plate — the portrait — which
-           stays on screen as the entrance's held image. The four project
-           spreads clear out (staggered, so it reads as a riffle ending rather
-           than a stack blinking off); the portrait is deliberately left
-           untouched, so the plate the visitor is left looking at is the
-           profile, not a project. The portrait is LAST in DOM order, so it is
-           already the top of the pile. */
+        /* 4. the four project spreads clear out (staggered, so it reads as a
+           riffle ending rather than a stack blinking off), leaving the
+           portrait — LAST in DOM order, so already the top of the pile — as
+           the single held plate. Step 6 then dissolves it as well. */
         plates.forEach(function (p, i) {
           if (i === plates.length - 1) return; // the portrait plate stays
           tl.to(
@@ -6824,13 +6835,27 @@
           2.04,
         );
 
+        /* 6. the portrait dissolves too: once the name has landed on it, the
+           sketchbook fades away and leaves the name alone on the ground. The
+           entrance therefore ends on the visitor's identity and the Continue
+           button, not on a held photograph. */
+        const portrait = plates[plates.length - 1];
+        if (portrait) {
+          tl.to(
+            portrait,
+            { opacity: 0, scale: 1.04, duration: 0.5, ease: "power1.inOut" },
+            2.5,
+          );
+        }
+
         /* Backstop: if the timeline never completes (tab backgrounded, an error
            mid-run), the cover still resolves so the Continue button appears
-           rather than leaving the visitor stranded. */
+           rather than leaving the visitor stranded. Sized past the last tween
+           (step 6 ends at ~3.0s) so it never fires mid-fade. */
         ctl.ctl.backstopId = setTimeout(function () {
           if (ctl.ctl.closed) return;
           ctl.resolveIntro();
-        }, 2500);
+        }, 3800);
         } /* end buildUpgrade() */
 
         /* The rack is gone, so there is nothing to wait for: build the richer
