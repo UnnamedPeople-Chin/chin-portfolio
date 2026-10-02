@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+.agents/
+.claude/
+graphify-out/
+_arsip-gambar/
+*.zip
+*.bak

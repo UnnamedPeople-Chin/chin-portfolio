@@ -1,0 +1,353 @@
+{
+  "version": 1,
+  "skills": {
+    "a11y": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/a11y/SKILL.md",
+      "computedHash": "d5a609bc3ff10957d91c097613129e801f8f8564e55a7e12ca7a616b9da8708a"
+    },
+    "adapt": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/adapt/SKILL.md",
+      "computedHash": "d0cab0074d110c3043c7002260e9d9bca22fc126999af3123a03ecfbdc562a8a"
+    },
+    "add-ui": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/add-ui/SKILL.md",
+      "computedHash": "29ccd14c2800d70e9836a57afacf164733fcf392ce4dc940a0d5b045adc1f05e"
+    },
+    "animate": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/animate/SKILL.md",
+      "computedHash": "af2635ae22572273d4e6399e8be3b38562fe97d73636ab271b62c8690a856834"
+    },
+    "api-and-interface-design": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-and-interface-design/SKILL.md",
+      "computedHash": "26f5a9e7abfd332d7a2e5887cf19bddd3393f47514c379b36bf227c1f15cdec4"
+    },
+    "arrange": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/arrange/SKILL.md",
+      "computedHash": "38a91d432b5cb6682c6bcf216b160a849fdff0af6dd18c6a49c5a30717156016"
+    },
+    "audit": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/audit/SKILL.md",
+      "computedHash": "f3315298e640651c2b3b305c3c33e1a675724112e0ac8a843130136ebabebfbf"
+    },
+    "bolder": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/bolder/SKILL.md",
+      "computedHash": "cdb290fe81619207ba394b33067e22133c211ebc876bcb5f440c9f04f2d07587"
+    },
+    "browser-testing-with-devtools": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/browser-testing-with-devtools/SKILL.md",
+      "computedHash": "639950ea71851d9c4919608cba8b6276cd1ba30cd82acdc4949c701537eed661"
+    },
+    "ci-cd-and-automation": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ci-cd-and-automation/SKILL.md",
+      "computedHash": "578b098a7d2352ccdac8b8abdc40eb6803538e81cf8382f138da6188a655087c"
+    },
+    "clarify": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/clarify/SKILL.md",
+      "computedHash": "73c6238497ded4c6842508f47c18926a9f6098bdd90076b24f058d191b705178"
+    },
+    "code-review-and-quality": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review-and-quality/SKILL.md",
+      "computedHash": "6231479cc74c7ed70a5618b81b3f94034d9806c0319a1a23d15f9b94a368c581"
+    },
+    "code-simplification": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-simplification/SKILL.md",
+      "computedHash": "7973e746e8e2ea5004d520da970c15a106824b8d6be1bcff48908aec021f3677"
+    },
+    "colorize": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/colorize/SKILL.md",
+      "computedHash": "c837252047438967796941e43024183ff98914e72eb815f914e674e0171f90b7"
+    },
+    "constraint-driven-development": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/constraint-driven-development/SKILL.md",
+      "computedHash": "0f760f914c6321cbdee7d47773ddb5b27a809f79049010b4aeead9084f38133b"
+    },
+    "context-engineering": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/context-engineering/SKILL.md",
+      "computedHash": "807434a4b178635a5539a1da241815ba7228f00b71f8e3ccd529472ce3bcaf80"
+    },
+    "critique": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/critique/SKILL.md",
+      "computedHash": "d7b07d3b64626256fd827cc4d17883b29583145edaf2dc36470c2a860743be1b"
+    },
+    "data-viz": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/data-viz/SKILL.md",
+      "computedHash": "c565003c4388c525e50c532b54215b73bdfcd0cc832a96d2875be52099679064"
+    },
+    "debugging-and-error-recovery": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/debugging-and-error-recovery/SKILL.md",
+      "computedHash": "6f437bc609eb8d0dc7f4768c17c9aeb85c9c7632bc36703af9f1367ffb47237a"
+    },
+    "delight": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/delight/SKILL.md",
+      "computedHash": "59e4aa5f4fcc40fd00d86e602a7af108be70d6a61530965350c19d54f9f8a874"
+    },
+    "deprecation-and-migration": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/deprecation-and-migration/SKILL.md",
+      "computedHash": "0d7b2002e250c02a260f6bc502d7a798ab8e8ca0c020c54d7b0f16053935c72c"
+    },
+    "depth": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/depth/SKILL.md",
+      "computedHash": "def7c649881ab93adf655db10aed6bddd183fc43828b816bf49bf08f78506e93"
+    },
+    "distill": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/distill/SKILL.md",
+      "computedHash": "02043598d9d15e0e45890a748b2796642859f9c9bb381a34c95d45eaea9f573a"
+    },
+    "documentation-and-adrs": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/documentation-and-adrs/SKILL.md",
+      "computedHash": "f13054e8bd32a432df3e0e68240758cf61a9e8817aa8540f9d9831f427c47e0e"
+    },
+    "doubt-driven-development": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/doubt-driven-development/SKILL.md",
+      "computedHash": "b13f18a68abf2a1fd0c30adeac9bec0ee551adec9f2a1dc2700f1a6e3eb48092"
+    },
+    "empty-state": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/empty-state/SKILL.md",
+      "computedHash": "69ae628457eaee32000df2318a771b1153131c468bb585217782d57fa03a7ea0"
+    },
+    "extract": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/extract/SKILL.md",
+      "computedHash": "ff8a498050d5a8be842d30da098e7c57f9d5e4c8c6e4410dba6e4d44d505935d"
+    },
+    "forms": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/forms/SKILL.md",
+      "computedHash": "3122712a3f8f3e816d5caaf6a5d07521a5f60fc0fbd6060e843c904c8ab7dfa5"
+    },
+    "frontend-design": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "0b2fb605cb910c3159fb286cf9d08101c6668f00567fa64f6547d5d74bb9d45b"
+    },
+    "frontend-ui-engineering": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-ui-engineering/SKILL.md",
+      "computedHash": "caada020b47fb51c68ba91f9bf390745e18f9d6c17e4c251b046ba74e43343d7"
+    },
+    "git-workflow-and-versioning": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-workflow-and-versioning/SKILL.md",
+      "computedHash": "e8e0d1cc98c0a6b81d2979442ae92addae32cd5194fb5c4eac4ac5228b408770"
+    },
+    "harden": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/harden/SKILL.md",
+      "computedHash": "1f82e0dab8637236ddf523dce194dfcf2133ab99a1d56faaeb0b5d0b902ce9f7"
+    },
+    "hierarchy": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/hierarchy/SKILL.md",
+      "computedHash": "c0bf94b3b15485a3bca38bda0cb5eee85b91ab60638a03fd4aee40e574345699"
+    },
+    "idea-refine": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/idea-refine/SKILL.md",
+      "computedHash": "9fc0ae5d8a074872a636d22f9c6fe71e041b86cddc9fe5af90ef654f5032ec5d"
+    },
+    "imagery": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/imagery/SKILL.md",
+      "computedHash": "7c549530c43b73b69a189ec6db1e6f45fe46120dcc5c4e010e871383bdf79a0c"
+    },
+    "incremental-implementation": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/incremental-implementation/SKILL.md",
+      "computedHash": "bb1198705f46dc9ff75fb5685a7a872de5924d743b44eb202135f5046750ab7e"
+    },
+    "interview-me": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/interview-me/SKILL.md",
+      "computedHash": "4229002dd862e6e037c8a01c3e31d9af097465c58b2c3611912edb2af005f303"
+    },
+    "localize": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/localize/SKILL.md",
+      "computedHash": "b426a5811d5d48fa6a7d92ee5e151a7ed0559704f5c75e590b58201edc554595"
+    },
+    "normalize": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/normalize/SKILL.md",
+      "computedHash": "a985ef30e858a99fa8745121d215f9a166fa6249859e470fdeeae39e25a4de2a"
+    },
+    "observability-and-instrumentation": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/observability-and-instrumentation/SKILL.md",
+      "computedHash": "e5eba32f952a29d20c0383728a9505d0ca2a90f1d8d075603e53804b441b2dd2"
+    },
+    "onboard": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/onboard/SKILL.md",
+      "computedHash": "16adf1b161458fcdd23b61a5e08ec9a285672141eb67628258ae97a403fc1292"
+    },
+    "optimize": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/optimize/SKILL.md",
+      "computedHash": "5c3dd43c5814cf976c60b5a3e5b01ba19b246ef967b2db0deea48d58c3364eb8"
+    },
+    "performance-optimization": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/performance-optimization/SKILL.md",
+      "computedHash": "f0a8e3bdb9b7d199434c2a5dd7cbb7d3cf69d802029cde1ef5daa07bffa27efc"
+    },
+    "planning-and-task-breakdown": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/planning-and-task-breakdown/SKILL.md",
+      "computedHash": "0dc14a1402cdabd376f2d81d2225fcb4a18ee63d58b945ff83affeb024285b8f"
+    },
+    "polish": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/polish/SKILL.md",
+      "computedHash": "52e4d308efb75c4e96050d4f5c404ef752d535877a59df2873e99b92087d1e2f"
+    },
+    "quieter": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/quieter/SKILL.md",
+      "computedHash": "da46465e25664f2c19d8100ebc50b5a7583af7735f46eea6ee9622d740834537"
+    },
+    "search": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/search/SKILL.md",
+      "computedHash": "8ff09ba95b5567b16c2bf1bc4617f506efef807073f09f0aa73c98868059ddc0"
+    },
+    "security-and-hardening": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-and-hardening/SKILL.md",
+      "computedHash": "1e0cd727cccd3c8c0834ce7722a8a2851e2e849f1352ee972f39311437b021d3"
+    },
+    "security-ux": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/security-ux/SKILL.md",
+      "computedHash": "0a455a05def63cfaaa3b016bb9d0fc489ff2ace496d3ad59391ece8d5f940fd3"
+    },
+    "setup": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/setup/SKILL.md",
+      "computedHash": "2ef39ca858762e2d7ed9754721de357d70e024c4c8ae9f92c6946a39f960903f"
+    },
+    "shipping-and-launch": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/shipping-and-launch/SKILL.md",
+      "computedHash": "65a2be8a52839ec029b779eaf2b59d981fb0956e1228a87c9897f5af8b672f1a"
+    },
+    "showcase": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/showcase/SKILL.md",
+      "computedHash": "440b697c4f6c36fff5cd64d8ca4b97dc7d9decde3e4afa674a21a97343a47e59"
+    },
+    "source-driven-development": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/source-driven-development/SKILL.md",
+      "computedHash": "d1923bb807f7db157a794f07a590ca639b3789b2f1a5eabef993f8df24791e2a"
+    },
+    "spec-driven-development": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/spec-driven-development/SKILL.md",
+      "computedHash": "d4dc15caa8d97749267da68676aeadff3fb5b8d9a4462664937137ac09610e4f"
+    },
+    "test": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/test/SKILL.md",
+      "computedHash": "8825d9bf4ebdc74a54da9fd7548e8d469b9d8090f40f6ced4338eec861db7659"
+    },
+    "test-driven-development": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/test-driven-development/SKILL.md",
+      "computedHash": "efb654aa37612ab1e7470e547b06a322c5e1837b6879525e32aa432d1281692b"
+    },
+    "typeset": {
+      "source": "aladicf/better-react-web-ui",
+      "sourceType": "github",
+      "skillPath": "skills/typeset/SKILL.md",
+      "computedHash": "3d16dcebb5a305328685aaa8f6e1676decf376098bf5fbc035bd91db89d16a4d"
+    },
+    "using-agent-skills": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/using-agent-skills/SKILL.md",
+      "computedHash": "4221dc84c943696829025a42c7961b257afdb8f1ba20af42463434a0d9c03812"
+    }
+  }
+}

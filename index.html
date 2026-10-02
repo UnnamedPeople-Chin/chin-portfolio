@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chin Portfolio · Jizdan YR</title>
+    <link rel="icon" href="/chin-portfolio/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/chin-portfolio/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/chin-portfolio/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ece7dc" />
+    <script>
+      location.replace('/landing-pages/chin-portfolio.html');
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Without this, a visitor with JavaScript disabled sits on a blank page
+         forever: the redirect above is the only thing that moves them on. -->
+    <noscript>
+      <p style="font-family: Georgia, serif; padding: 32px">
+        <a href="/landing-pages/chin-portfolio.html">Continue to the portfolio &rarr;</a>
+      </p>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

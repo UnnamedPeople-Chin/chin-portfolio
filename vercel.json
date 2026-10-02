@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/landing-pages/chin-portfolio.html"
+    }
+  ]
+}

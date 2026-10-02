@@ -1,0 +1,212 @@
+.project-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(43, 39, 33, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.project-modal {
+  position: relative;
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  background: #fffdf9;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(43, 39, 33, 0.3);
+  overflow: hidden;
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 253, 249, 0.9);
+  border: 1px solid rgba(43, 39, 33, 0.12);
+  border-radius: 50%;
+  font-size: 28px;
+  line-height: 1;
+  color: #2b2721;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+
+.modal-close:hover {
+  background: #fff;
+  border-color: #9a6a3e;
+  transform: scale(1.08);
+}
+
+.modal-hero {
+  width: 100%;
+  height: 280px;
+  overflow: hidden;
+  background: #f5f1e8;
+}
+
+.modal-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modal-content {
+  padding: 32px;
+  max-height: calc(90vh - 280px);
+  overflow-y: auto;
+}
+
+.modal-header {
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(43, 39, 33, 0.12);
+  padding-bottom: 16px;
+}
+
+.modal-header h2 {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 32px;
+  font-weight: 400;
+  margin: 0 0 8px;
+  color: #2b2721;
+}
+
+.modal-tagline {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 16px;
+  font-weight: 300;
+  color: rgba(43, 39, 33, 0.65);
+  margin: 0;
+  font-style: italic;
+}
+
+.modal-body {
+  font-family: 'Newsreader', Georgia, serif;
+  color: #2b2721;
+}
+
+.modal-description {
+  font-size: 18px;
+  line-height: 1.7;
+  margin: 0 0 28px;
+  color: rgba(43, 39, 33, 0.85);
+}
+
+.modal-section {
+  margin-bottom: 24px;
+}
+
+.modal-section h3 {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0 0 12px;
+  color: #2b2721;
+  letter-spacing: 0.01em;
+}
+
+.tech-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tech-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  background: rgba(154, 106, 62, 0.08);
+  border: 1px solid rgba(154, 106, 62, 0.2);
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #2b2721;
+  transition: all 0.2s ease;
+}
+
+.tech-badge:hover {
+  background: rgba(154, 106, 62, 0.12);
+  border-color: rgba(154, 106, 62, 0.35);
+}
+
+.modal-links {
+  display: flex;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(43, 39, 33, 0.08);
+}
+
+.modal-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 20px;
+  background: #2b2721;
+  color: #fffdf9;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.modal-link:hover {
+  background: #9a6a3e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(43, 39, 33, 0.15);
+}
+
+@media (max-width: 640px) {
+  .project-modal {
+    max-height: 95vh;
+    border-radius: 8px;
+  }
+
+  .modal-hero {
+    height: 200px;
+  }
+
+  .modal-content {
+    padding: 24px 20px;
+    max-height: calc(95vh - 200px);
+  }
+
+  .modal-header h2 {
+    font-size: 26px;
+  }
+
+  .modal-description {
+    font-size: 16px;
+  }
+
+  .modal-links {
+    flex-direction: column;
+  }
+
+  .modal-link {
+    justify-content: center;
+  }
+}

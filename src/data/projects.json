@@ -1,0 +1,74 @@
+{
+  "projects": [
+    {
+      "id": "aethercast",
+      "title": "AetherCast",
+      "tagline": "JavaScript · MediaPipe · Electron",
+      "description": "Real-time hand-tracking particle engine that transforms gestures into dynamic visual interactions. Built with MediaPipe for robust hand detection and custom WebGL particle systems.",
+      "image": "/chin-portfolio/aethercast-modal.webp",
+      "techStack": ["JavaScript", "MediaPipe", "Electron", "WebGL", "Canvas API"],
+      "tags": ["/electron-app", "/mediapipe-tracking", "/gesture-control"],
+      "links": {
+        "github": "https://github.com/UnnamedPeople-Chin/AetherCast",
+        "demo": ""
+      },
+      "year": 2024
+    },
+    {
+      "id": "starwars-ar",
+      "title": "AR Character Visualizer",
+      "tagline": "C# · Unity · AR Foundation",
+      "description": "Augmented reality engine for interactive 3D character visualization with gesture-based controls. Uses AR Foundation for cross-platform marker tracking and holographic rendering.",
+      "image": "/chin-portfolio/ar-visualizer-modal.webp",
+      "techStack": ["C#", "Unity", "AR Foundation", "Vuforia", "3D Modeling"],
+      "tags": ["/ar-foundation", "/unity-3d", "/hologram-render"],
+      "links": {
+        "github": "https://github.com/UnnamedPeople-Chin/Star-Wars-AR-Interactive-Character-Visualizer",
+        "demo": ""
+      },
+      "year": 2024
+    },
+    {
+      "id": "moneyflow",
+      "title": "MoneyFlow Pro",
+      "tagline": "Java · Swing GUI",
+      "description": "Personal finance tracker with visual analytics dashboard. Features cashflow projections, category-based budgeting, and transaction history with search/filter capabilities.",
+      "image": "/chin-portfolio/moneyflow-modal.webp",
+      "techStack": ["Java", "Swing", "JDBC", "SQLite", "JFreeChart"],
+      "tags": ["/finance-tracker", "/java-swing"],
+      "links": {
+        "github": "https://github.com/UnnamedPeople-Chin/Project-PBO-MoneyFlow",
+        "demo": ""
+      },
+      "year": 2023
+    },
+    {
+      "id": "schedule-organizer",
+      "title": "Schedule Organizer",
+      "tagline": "JavaScript · Firebase",
+      "description": "Collaborative task planner with real-time cloud synchronization. Multi-user support with Firebase Realtime Database, task assignments, and deadline tracking.",
+      "image": "/chin-portfolio/schedule-organizer-modal.webp",
+      "techStack": ["JavaScript", "Firebase", "Firestore", "Authentication", "Hosting"],
+      "tags": ["/realtime-sync", "/firebase-cloud"],
+      "links": {
+        "github": "https://github.com/UnnamedPeople-Chin/schedule-organizer",
+        "demo": ""
+      },
+      "year": 2023
+    }
+  ],
+  "skills": [
+    "/fullstack-dev",
+    "/mediapipe-tracking",
+    "/ar-foundation",
+    "/electron-app",
+    "/unity-3d",
+    "/ai-engineer",
+    "/hologram-render",
+    "/gesture-control",
+    "/finance-tracker",
+    "/realtime-sync",
+    "/java-swing",
+    "/firebase-cloud"
+  ]
+}
