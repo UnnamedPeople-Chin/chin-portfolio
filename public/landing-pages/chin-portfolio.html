@@ -5595,18 +5595,32 @@
           const root = document.documentElement;
           const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
           const MOBILE = matchMedia("(max-width: 640px)").matches;
-          /* Once per SESSION, not once per load. sessionStorage is the right
-             store: a reload or a back-navigation within the same tab skips the
-             cover, but a new tab or a new visit gets the entrance again (which
-             localStorage would wrongly suppress forever). Guarded because
-             sessionStorage throws in some privacy modes; a throw means "no
-             memory", so the intro simply plays, which is the safe default. */
+          /* The entrance plays on EVERY load — including a refresh (F5 / Cmd-R),
+             which is a deliberate "show me that again". It is skipped in exactly
+             one case: the tab comes BACK to this page from another page without
+             a fresh load, where re-running a 4-second cover over already-seen
+             content would just be in the way. `navigation.type` tells the cases
+             apart: 'navigate' / 'reload' play, 'back_forward' skips.
+             sessionStorage is only the "this tab has already shown it" flag for
+             the back/forward case; guarded, because it throws in some privacy
+             modes — a throw means "no memory", so the intro simply plays, which
+             is the safe default. */
           const SESSION_KEY = "cp-intro-played";
-          let introSeen = false;
+          let navType = "navigate";
           try {
-            introSeen = sessionStorage.getItem(SESSION_KEY) === "1";
+            navType =
+              (performance.getEntriesByType("navigation")[0] || {}).type ||
+              "navigate";
           } catch (e) {
-            introSeen = false;
+            navType = "navigate";
+          }
+          let introSeen = false;
+          if (navType === "back_forward") {
+            try {
+              introSeen = sessionStorage.getItem(SESSION_KEY) === "1";
+            } catch (e) {
+              introSeen = false;
+            }
           }
           const plates = Array.prototype.slice.call(
             stage.querySelectorAll(".intro-plate"),
@@ -5740,7 +5754,7 @@
              latched so any later startRiffle() is a no-op, and the stage is
              removed synchronously, so the post-CDN upgrade runner bails on its
              own `!stage.parentNode` guard. Used by reduced motion and by the
-             once-per-session skip. */
+             back/forward return that skips the replay. */
           function showContentNow() {
             introStarted = true;
             introOn = false;
@@ -5769,20 +5783,21 @@
             return;
           }
 
-          /* Already played this session: land on the content with no cover.
-             Deliberately AFTER the ?nointro/?shot switch (those are explicit
-             per-load overrides) and BEFORE the scroll lock, so there is no lock
-             to release and no listener to arm. */
+          /* Already played and the tab came BACK to this page (not a fresh load,
+             not a reload): land on the content with no cover. Deliberately AFTER
+             the ?nointro/?shot switch (those are explicit per-load overrides)
+             and BEFORE the scroll lock, so there is no lock to release and no
+             listener to arm. Reached only for `navType === "back_forward"`. */
           if (introSeen) {
             showContentNow();
             return;
           }
 
           /* ---- interactive paths: lock scroll, trap focus, arm the skip ---- */
-          /* From here the cover is definitely going to play, so remember it:
-             a reload or back-navigation in this tab will skip straight to the
+          /* The cover is definitely going to play, so flag this tab as having
+             seen it, so a later back-navigation here skips straight to the
              content. Written at the last possible moment so an aborted load
-             does not burn the one showing. */
+             does not burn the showing. */
           try {
             sessionStorage.setItem(SESSION_KEY, "1");
           } catch (e) {
