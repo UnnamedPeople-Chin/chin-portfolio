@@ -3963,6 +3963,15 @@
 
         stage.addEventListener("pointerdown", (e) => {
           if (e.button !== 0) return;
+          /* The arrows are real <button>s wired through `onclick` (so keyboard
+             Enter/Space reaches them too). Capturing the pointer here — or
+             cancelling the pointerdown — retargets the follow-up click onto
+             `stage`, so the button never sees it and the arrows do nothing.
+             Leave them untouched and let the click land. */
+          if (e.target.closest(".sb-arrow")) {
+            hideHint();
+            return;
+          }
           e.preventDefault(); /* no text selection, no image drag */
           const onBook = e.target.closest(".sb-zone");
           stage.setPointerCapture(e.pointerId);
@@ -5660,15 +5669,18 @@
             if (closed) return;
             closed = true;
             root.classList.remove("intro-lock");
+            /* Hand the page back to Lenis now the cover is gone — it was stopped
+               when the cover came up, so a wheel or drag could not slide the
+               page out from under it. */
+            if (window.__lenis) window.__lenis.start();
             /* Drop the focus trap: `inert` on the page's real landmarks kept Tab
                from reaching links hidden behind the cover. */
             inertNodes.forEach(function (n) {
               n.removeAttribute("inert");
             });
-            window.removeEventListener("keydown", onSkip, true);
-            window.removeEventListener("pointerdown", onSkip, true);
-            window.removeEventListener("touchstart", onSkip, true);
-            window.removeEventListener("wheel", onSkip, true);
+            window.removeEventListener("keydown", onIntroKey, true);
+            window.removeEventListener("wheel", swallowScroll, true);
+            window.removeEventListener("touchmove", swallowScroll, true);
             window.removeEventListener("resize", onFallbackResize);
             if (ctl.onResize) window.removeEventListener("resize", ctl.onResize);
           }
@@ -5719,12 +5731,33 @@
             else setTimeout(removeNow, 340);
           }
 
-          /* Universal skip: any deliberate input jumps to the end state (the
-             cover fades, the riffle fires) rather than cutting, so it still
-             reads as intentional. Scroll-ish inputs are preventDefault-ed while
-             the cover is up so the page cannot scroll out from under it. */
-          function onSkip(e) {
-            if (e && e.cancelable && e.type !== "keydown") e.preventDefault();
+          /* Scroll-lock guard: while the cover is up the page must not scroll
+             out from under it, so scroll-ish inputs are swallowed. They no
+             longer dismiss the cover — the entrance holds until the visitor
+             presses Continue (or Space / Enter on the keyboard). */
+          function swallowScroll(e) {
+            /* Leave the Continue button's own gestures alone so nothing here can
+               interfere with the tap / click that advances. */
+            const t = e && e.target;
+            if (t && t.closest && t.closest("#introContinueBtn")) return;
+            if (e && e.cancelable) e.preventDefault();
+          }
+
+          /* The only keyboard exit is Space or Enter — accepted anywhere, so a
+             visitor who never moved focus can still go on. Every other key
+             (Escape included) leaves the cover alone: a stray keypress should
+             not skip the reveal the visitor is still reading. */
+          function onIntroKey(e) {
+            if (e.key !== " " && e.key !== "Enter" && e.key !== "Spacebar") return;
+            const t = e.target;
+            if (
+              t &&
+              (t.tagName === "INPUT" ||
+                t.tagName === "TEXTAREA" ||
+                t.isContentEditable)
+            )
+              return;
+            if (e.cancelable) e.preventDefault();
             startRiffle();
             dismiss(false);
           }
@@ -5817,10 +5850,23 @@
           }
 
           root.classList.add("intro-lock");
-          window.addEventListener("keydown", onSkip, true);
-          window.addEventListener("pointerdown", onSkip, true);
-          window.addEventListener("touchstart", onSkip, true);
-          window.addEventListener("wheel", onSkip, true);
+          /* Stop Lenis while the cover is up. `html.intro-lock`'s overflow:hidden
+             alone does not hold it: Lenis drives the page with window.scrollTo,
+             which overflow:hidden does not block, so a wheel would still slide
+             the page out from under the cover. release() restarts it. */
+          if (window.__lenis) window.__lenis.stop();
+          /* Space / Enter is the keyboard exit; the scroll guards keep the page
+             from moving under the cover (non-passive so preventDefault counts —
+             these are passive by default on window). */
+          window.addEventListener("keydown", onIntroKey, true);
+          window.addEventListener("wheel", swallowScroll, {
+            capture: true,
+            passive: false,
+          });
+          window.addEventListener("touchmove", swallowScroll, {
+            capture: true,
+            passive: false,
+          });
 
           /* Focus trap: make the page behind the cover inert so a keyboard user
              cannot Tab into nav links that are visually hidden. Guarded because
@@ -6101,6 +6147,14 @@
             syncTouch: false,
           });
           window.__lenis = lenis;
+          /* The entrance cover is up when Lenis is created (it is built after
+             the intro block, which has already added html.intro-lock). Stop it
+             so a wheel cannot slide the page out from under the cover — the
+             intro's release() starts it again when the cover lifts. Without
+             this the overflow:hidden lock alone does not hold, because Lenis
+             scrolls via window.scrollTo. */
+          if (document.documentElement.classList.contains("intro-lock"))
+            lenis.stop();
           function lenisRaf(time) {
             lenis.raf(time);
             requestAnimationFrame(lenisRaf);
