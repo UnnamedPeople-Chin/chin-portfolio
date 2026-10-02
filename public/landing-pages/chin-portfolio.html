@@ -2608,6 +2608,31 @@
         .np-card.is-playing .np-disc{animation:none}
         .np-disc{transition:none}
       }
+      /* =====================================================================
+         anime.js layer - progressive enhancement for the chrome and the
+         micro-interactions. Every rule here is keyed off a class the module
+         below adds ONLY after anime.js has loaded and only when motion is
+         allowed, so a blocked CDN, a script error, or a reduced-motion
+         visitor all get the plain, fully-visible page. Nothing here is
+         required to read the site, and nothing here is touched by the
+         GSAP/Lenis block, the scroll-reveal system, or the tag cloud (which
+         owns its own GSAP entrance).
+         ===================================================================== */
+      .anime-armed .top,
+      .anime-armed .hero-kicker,
+      .anime-armed .foot-inner{opacity:0}
+      @media (prefers-reduced-motion:reduce){
+        .anime-armed .top,
+        .anime-armed .hero-kicker,
+        .anime-armed .foot-inner{opacity:1 !important}
+      }
+      html:not(.js) .top,
+      html.js-failed .top,
+      html:not(.js) .hero-kicker,
+      html.js-failed .hero-kicker,
+      html:not(.js) .foot-inner,
+      html.js-failed .foot-inner{opacity:1 !important}
+
     </style>
   </head>
   <body>
@@ -7122,6 +7147,243 @@
           st.tx = 0; st.ty = 0;
         });
         raf = requestAnimationFrame(frame);
+      })();
+    </script>
+    <!-- anime.js v4 - the site's micro-interaction layer (global `anime`).
+         Deferred so it never blocks parsing or the GSAP/Lenis block above; the
+         inline module below waits for DOMContentLoaded, by which point this
+         script has run. If the CDN is blocked the module simply does nothing
+         and the page stays exactly as it is. -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/animejs@4.5.0/dist/bundles/anime.umd.min.js"
+      integrity="sha384-InMmvD3VoYcY7hGjSC80aLb2bNNE4CzpX+Eq6FVDlmB0IKgDvmfPw4UY8L/M++iG"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script>
+      /* ==================================================================
+         anime.js layer.
+
+         Purely additive: it animates the page's own chrome and adds pointer
+         micro-interactions, and it never touches the intro cover, the
+         scroll-reveal system, the tag cloud (it owns its own GSAP entrance),
+         or the plate-card tilt. Two safety rules keep it honest:
+           1. the `.anime-armed` class that hides the elements it will animate
+              in is added ONLY here, after anime.js is confirmed present and
+              motion is allowed - so a blocked CDN or a reduced-motion visitor
+              never sees anything hidden;
+           2. every effect is wrapped in try/catch, and each one reveals its
+              targets on completion or on error.
+         ================================================================== */
+      (function () {
+        "use strict";
+        if (window.__animeLayer) return;
+        window.__animeLayer = true;
+
+        var root = document.documentElement;
+        var sel = function (q) {
+          return Array.prototype.slice.call(document.querySelectorAll(q));
+        };
+        var reduced = function () {
+          if (window.REDUCED) return true;
+          try {
+            return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          } catch (e) {
+            return false;
+          }
+        };
+        var unarm = function () {
+          root.classList.remove("anime-armed");
+        };
+
+        /* Run `fn` once the entrance cover has lifted. With no cover on this
+           load (?nointro, a session replay, reduced motion) it runs at once. */
+        function whenIntroDone(fn) {
+          if (!root.classList.contains("intro-lock")) {
+            fn();
+            return;
+          }
+          var done = false,
+            mo = null,
+            t = 0;
+          var go = function () {
+            if (done) return;
+            done = true;
+            if (mo) mo.disconnect();
+            clearTimeout(t);
+            fn();
+          };
+          mo = new MutationObserver(function () {
+            if (!root.classList.contains("intro-lock")) go();
+          });
+          mo.observe(root, { attributes: true, attributeFilter: ["class"] });
+          t = setTimeout(go, 14000); /* the cover always lifts; never strand */
+        }
+
+        /* --- 1. the chrome rises once the cover has gone ------------------ */
+        function arrival(A) {
+          var top = document.querySelector(".top");
+          var kicker = document.querySelector(".hero-kicker");
+          var foot = document.querySelector(".foot-inner");
+          if (!top && !kicker && !foot) {
+            unarm();
+            return;
+          }
+          var tl = A.createTimeline({
+            defaults: { duration: 640, ease: "outExpo" },
+            onComplete: unarm,
+          });
+          if (top) tl.add(top, { y: [-16, 0], opacity: [0, 1] });
+          if (kicker)
+            tl.add(
+              kicker,
+              {
+                opacity: [0, 1],
+                y: [10, 0],
+                /* the line types itself in as it lands */
+                text: A.scrambleText({ chars: "uppercase", duration: 660 }),
+              },
+              "<+=120",
+            );
+          if (foot) tl.add(foot, { opacity: [0, 1], y: [18, 0] }, "<+=60");
+          /* belt and braces: the class is released on completion, but a
+             stalled tween must never leave the chrome hidden */
+          setTimeout(unarm, 5000);
+        }
+
+        /* NOTE: the tag cloud is deliberately NOT touched here. It already has
+           its own GSAP entrance (`initPlateCloudAnimation` -> `runEntrance`),
+           which sets each chip to opacity:0/scale:0 and sweeps them in from the
+           centre with `back.out(1.25)`. A second animator on the same elements
+           would fight it and could leave a chip stuck at scale 0, so this layer
+           stays out of the cloud entirely. */
+
+        /* --- 3. the scroll cue draws itself in ---------------------------- */
+        function chevrons(A) {
+          var strokes = sel("#heroDown polyline");
+          if (!strokes.length) return;
+          var drawable = A.svg.createDrawable(strokes);
+          if (!drawable || !drawable.length) return;
+          A.animate(drawable, {
+            draw: ["0 0", "0 1"],
+            duration: 900,
+            delay: A.stagger(150),
+            ease: "inOutQuint",
+          });
+        }
+
+        /* --- 4. buttons lean toward the pointer --------------------------- */
+        function magnets(A) {
+          /* .hero-down is left out on purpose: it is centred with
+             `transform: translateX(-50%)`, and anime writes `transform`. */
+          var targets = sel(".icon-btn, .np-btn");
+          if (!targets.length) return;
+          var PULL = 6;
+          targets.forEach(function (el) {
+            var a = A.createAnimatable(el, {
+              x: 0,
+              y: 0,
+              duration: 480,
+              ease: "outElastic(1, .55)",
+            });
+            var box = null;
+            el.addEventListener(
+              "pointerenter",
+              function () {
+                box = el.getBoundingClientRect();
+              },
+              { passive: true },
+            );
+            el.addEventListener(
+              "pointermove",
+              function (e) {
+                if (e.pointerType && e.pointerType !== "mouse" && e.pointerType !== "pen")
+                  return;
+                if (!box) box = el.getBoundingClientRect();
+                a.x(((e.clientX - (box.left + box.width / 2)) / box.width) * PULL).y(
+                  ((e.clientY - (box.top + box.height / 2)) / box.height) * PULL,
+                );
+              },
+              { passive: true },
+            );
+            el.addEventListener(
+              "pointerleave",
+              function () {
+                box = null;
+                a.x(0).y(0);
+              },
+              { passive: true },
+            );
+          });
+        }
+
+        /* --- 5. the engraved plates drift with the scroll ----------------- */
+        function ornParallax(A) {
+          var orns = sel(".orn");
+          if (orns.length < 2) return;
+          var amp = [-34, -20, -27, -16, -25, -19, -30, -14, -23];
+          /* One animatable PER ornament: the v4 `createAnimatable` setter takes a
+             single scalar, so a shared instance + an array of values is silently
+             ignored (verified in headless Chrome). Per-element instances also let
+             each plate keep its own amplitude. */
+          var anims = [];
+          for (var k = 0; k < orns.length; k++) {
+            anims.push(
+              A.createAnimatable(orns[k], {
+                y: 0,
+                duration: 420,
+                ease: "outQuad",
+              }),
+            );
+          }
+          var last = -1;
+          A.onScroll({
+            target: document.body,
+            enter: "bottom top",
+            leave: "top bottom",
+            onUpdate: function (self) {
+              var p = self.progress;
+              if (typeof p !== "number") return;
+              if (Math.abs(p - last) < 0.003) return;
+              last = p;
+              for (var i = 0; i < anims.length; i++) {
+                anims[i].y((p - 0.5) * amp[i % amp.length] * 2);
+              }
+            },
+          });
+        }
+
+        function init() {
+          var A = window.anime;
+          if (!A) return; /* CDN blocked: leave the page exactly as it is */
+          if (reduced()) return; /* no arming, no motion */
+
+          root.classList.add("anime-armed");
+
+          try {
+            chevrons(A);
+          } catch (e) {}
+          try {
+            magnets(A);
+          } catch (e) {}
+          try {
+            ornParallax(A);
+          } catch (e) {}
+
+          whenIntroDone(function () {
+            try {
+              arrival(A);
+            } catch (e) {
+              unarm();
+            }
+          });
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", init);
+        } else {
+          init();
+        }
       })();
     </script>
   </body>
