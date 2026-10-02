@@ -392,6 +392,13 @@
       }
       .botany{
         position:absolute;bottom:0;width:clamp(120px,15vw,250px);opacity:.5;
+        /* `height:auto` is required, not cosmetic: the markup carries
+           width/height attributes (the intrinsic size, so the box is known
+           before the file lands), and without this the height attribute is
+           honoured as a used height and the image stretches — the CSS only
+           ever sets `width`. With `auto`, the attribute pair supplies the
+           aspect ratio and the plate keeps its true proportions. */
+        height:auto;
         pointer-events:none;user-select:none;z-index:0;
         /* the botanicals are painted as cream-on-cream; invert them and screen
            them so they read as engraved light on the plate instead of two
@@ -431,6 +438,12 @@
         position:absolute;pointer-events:none;user-select:none;z-index:0;
         mix-blend-mode:screen;-webkit-user-drag:none;
         opacity:var(--o, .18);
+        /* Only the two plates below set an explicit height; for the rest the
+           markup's width/height attributes are the aspect-ratio source, so
+           `auto` keeps them from being read as a fixed used height (which
+           would stretch any plate whose CSS sizes it by width alone). The
+           height-setting rules below override this. */
+        height:auto;
       }
       .orn-colonnade{--o:.19;left:0;bottom:0;height:min(92%,900px);width:auto}
       .orn-clouds{--o:.16;right:0;top:0;height:min(88%,820px);width:auto}
@@ -1699,397 +1712,74 @@
         margin-top: 1.1em;
       }
 
-      /* --- Entrance phase 1: the rack -------------------------------------
-         A shelf of sketchbooks, drawn entirely from the site's tokens — no
-         images at all — so a row of thirty costs nothing to load. Each book
-         is a spine-on rectangle: a two-stop gradient down the spine, a paper
-         page-block striation along the top edge, one hairline rule across the
-         middle, and its title set vertically in the same tracked caps the
-         rest of the site uses. They stand in a single perspective row that
-         recedes left and right, and the five real projects sit in the middle
-         of the row and lift out in turn while the panel above names each.
-
-         The whole shelf is sized in `em` off .rack-row's font-size, so one
-         clamp scales it from a narrow laptop to a wide monitor without a
-         single width media query. Hidden until playRack() turns it on, so
-         the static panel text below can never flash before the animation. */
-      .rack {
-        position: absolute;
-        inset: 0;
-        z-index: 1;
-        visibility: hidden;
-      }
-      .rack.is-on {
-        visibility: visible;
-      }
-      /* Panel pinned near the top and shelf pinned near the bottom, rather
-         than stacked in a centred column: the lifted book rises ~90px out of
-         the row, and a centred column puts the panel exactly where that book
-         arrives. Anchoring the two to opposite edges guarantees the clear
-         band between them at every viewport height. */
-      .rack-panel {
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: clamp(52px, 11vh, 120px);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        padding: 0 clamp(16px, 4vw, 48px);
-      }
-      .rack-kicker {
-        font-family: var(--font);
-        font-size: clamp(9.5px, 1vw, 12px);
-        letter-spacing: var(--track-caps);
-        text-transform: uppercase;
-        color: var(--earth-text);
-        margin: 0 0 0.7em;
-      }
-      .rack-title {
-        font-family: var(--display);
-        font-weight: 400;
-        color: var(--ink);
-        font-size: clamp(28px, 4.2vw, 58px);
-        line-height: 1.02;
-        letter-spacing: -0.015em;
-        margin: 0;
-        will-change: transform, opacity;
-      }
-      .rack-meta {
-        font-family: var(--font);
-        font-size: clamp(11px, 1.15vw, 14px);
-        color: var(--ink-soft-text);
-        margin: 0.5em 0 0;
-        will-change: opacity;
-      }
-      /* The camera. It sits above the shelf and dead centre: above, so the
-         eye looks down onto the row and the top page-blocks read; centre, so
-         the recession is symmetric and the row does not drift diagonally.
-
-         The X of `perspective-origin` is the vanishing point of every
-         `translateZ` in the row — a book pushed back is projected toward it —
-         so an off-centre X drags the whole shelf sideways as it recedes. The
-         earlier build sat at 54% and read as a diagonal slump. At 50% each
-         book steps straight back toward the centre line and the row stays
-         level.
-
-         The Y is a compromise: high enough to open the tops up, low enough
-         that the row still reads as standing on a shelf rather than lying
-         back. The projection pulls a receding book toward the origin, so a
-         high origin also lifts the outer volumes; the seat's own `ty` pulls
-         them back down so the whole row keeps one shelf line. */
-      .rack-scene {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: clamp(56px, 15vh, 150px);
-        display: flex;
-        justify-content: center;
-        perspective: 1000px;
-        perspective-origin: 50% -70%;
-      }
-      /* ...and the row is tipped back AND swung round to a three-quarter
-         view, so its tops lean away from the viewer and the eye (already
-         lifted by the origin above) looks down onto the page blocks — the
-         classic bookshelf angle, and the one thing that makes a row of boxes
-         read as volumes instead of a wall of cards.
-
-         The YAW lives here, on the whole row, not as a symmetric fan on the
-         individual books. A fan turns the two ends in opposite directions
-         and, because each book also carries its own depth offset, the row
-         curves — an arc no flat board can support, which is what made the
-         earlier build slump diagonally. One yaw on the stage turns every
-         book the same way, so the row stays a straight, coplanar shelf seen
-         from one side, and the depth comes from the perspective for free.
-
-         Both signs matter: `rotateX` is NEGATIVE because +rotateX lifts the
-         far edge and pushes every top block edge-on, while -rotateX drops the
-         far edge and opens the tops up. `preserve-3d` is what lets each book
-         keep its own box while the row carries the camera for all of them. */
-      /* The shelf and the row share one preserve-3d box, so the board is the
-         actual floor the volumes stand on: it inherits the row's camera and
-         recedes with it, instead of sitting in the flat plane behind them. */
-      .rack-stage {
-        position: relative;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        transform-style: preserve-3d;
-        /* The row is sized here, not on .rack-row, so the `em` in the
-           recentring shift below is the same `em` the books are built in.
-           `translateX` comes FIRST, before the rotations, so it is applied in
-           the scene's flat frame: the yaw swings the row about its centre and
-           pushes its silhouette left, and this nudges it back to the middle
-           of the viewport. Placed after the rotations it would slide along
-           the row's own turned axis and change the depth as well. */
-        font-size: clamp(11px, 1.35vw, 21px);
-        transform: translateX(5.5em) rotateX(-9deg) rotateY(18deg);
-      }
-      .rack-row {
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        gap: clamp(4px, 0.55vw, 13px);
-        transform-style: preserve-3d;
-        /* Five ~11em volumes plus gaps put the row near 60em wide, so the
-           stage's clamp above keeps it at ~80% of the viewport from a 1024
-           laptop to a wide monitor. The intro is skipped under 640px, so the
-           lower bound is a safety net, not a layout case. */
-      }
-      /* A book is a real box, not a rotated rectangle: a front cover, a back
-         cover one book-thickness behind it, a paper page block across the
-         top, and a fore-edge down each side. The SHELL carries both the
-         perspective seat and the lift, so a lifted volume keeps its full
-         thickness — animating only the front face (the previous build) is
-         what made the row read flat. */
-      .rack-book {
-        position: relative;
-        flex: 0 0 auto;
-        width: calc(var(--bw) * 1em);
-        height: calc(var(--bh) * 1em);
-        transform-style: preserve-3d;
-        transform-origin: 50% 100%;
-        transform: rotateY(var(--ry)) translateZ(calc(var(--tz) * 1em))
-          translateY(calc(var(--ty) * 1em)) scale(var(--sc));
-      }
-      /* Neighbour dim. When one volume is pulled out, the rest of the shelf
-         steps back so the lifted book is the only thing at full strength.
-         The cue is TONAL and OPAQUE — desaturate and drop the light, but keep
-         the books solid. Two reasons it must not fade:
-         1. A translucent book lets the row behind it show through, so the
-            shelf stops reading as a row of solid volumes and starts reading
-            as a stack of glass panes. A book that has stepped back is still a
-            book; it is quieter, not transparent.
-         2. The row is a `preserve-3d` context, so the browser sorts these
-            shells by real depth, not by z-index. Any see-through at all and
-            the ghosted neighbours visibly cut through the lifted volume.
-
-         Applied to the FACES, never to .rack-book itself: opacity and filter
-         are grouping properties, and either one on the shell would force its
-         used `transform-style` to `flat`, collapsing the whole 3D box into a
-         single flat card. The class lives on the shell and reaches the faces
-         by descendant selector, so a face needs no state of its own. The
-         transition sits on the base rule, and the filtered state is opt-in —
-         an undimmed book runs no filter at all, so the row costs no extra
-         compositing layers while it is simply standing there. */
-      .rack-f {
-        position: absolute;
-        transition:
-          opacity 0.3s ease,
-          filter 0.3s ease;
-      }
-      .rack-book.is-dim .rack-f {
-        filter: saturate(0.5) brightness(0.84);
-      }
-      .rack-front,
-      .rack-back {
-        inset: 0;
-      }
-      /* the front cover — the spine, and the only face that carries type.
-         A real board is a slab, not a UI card: the radius is near-square, the
-         edges are asymmetric (a bright paper-coloured turn-in at the head and
-         fore-edge, a darker shadow down the hinge), and the only shadow is a
-         tight contact shadow pooling under the volume. The earlier build's
-         uniform 1px light border, 2/3/3/2 radius and floating 10px drop
-         shadow are exactly the signature of a floating card, which is what
-         made the row read as dominoes. */
-      .rack-front {
-        border-radius: 1px 2px 2px 1px;
-        background: var(--bk);
-        box-shadow:
-          inset 1px 0 0 rgba(244, 237, 221, 0.28),
-          inset -1px 0 0 rgba(0, 0, 0, 0.42),
-          inset 0 1px 0 rgba(244, 237, 221, 0.22),
-          inset 0 -1px 0 rgba(0, 0, 0, 0.46),
-          0 2px 3px -2px rgba(2, 5, 14, 0.75);
-      }
-      /* The hinge: the shadow that falls from the board onto the shoulder of
-         the spine, so the cover reads as a cover wrapping a block. */
-      .rack-front::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        background: linear-gradient(
-          90deg,
-          rgba(0, 0, 0, 0.42) 0,
-          rgba(0, 0, 0, 0.12) 7%,
-          rgba(0, 0, 0, 0) 22%
-        );
-        pointer-events: none;
-      }
-      /* the head and tail bands: two foil rules near the top of the spine,
-         which is the one detail that reads as "bound volume" at this size. */
-      .rack-front::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 16%;
-        height: 1px;
-        background: rgba(198, 160, 83, 0.55);
-        box-shadow: 0 0.7em 0 rgba(198, 160, 83, 0.3);
-      }
-      /* the back cover, exactly one thickness behind the front */
-      .rack-back {
-        transform: translateZ(calc(var(--bd) * -1em));
-        border-radius: 1px 2px 2px 1px;
-        background: var(--bk2);
-        box-shadow: inset 0 1px 0 rgba(244, 237, 221, 0.1);
-      }
-      /* The top edge: the cover board at the front, then the page block. The
-         striations run front-to-back (90deg), so they read as stacked leaves
-         seen edge-on rather than as stripes painted across the width. */
-      .rack-top {
-        top: 0;
-        left: 0;
-        right: 0;
-        height: calc(var(--bd) * 1em);
-        transform-origin: 50% 0;
-        transform: rotateX(-90deg);
-        background:
-          linear-gradient(180deg, var(--bk) 0 11%, rgba(0, 0, 0, 0) 11%),
-          repeating-linear-gradient(
-            90deg,
-            var(--paper) 0 1.5px,
-            var(--hairline) 1.5px 3px
-          );
-        box-shadow: inset 0 -2px 3px rgba(2, 5, 14, 0.5);
-      }
-      /* the fore-edges: the page block seen from the side, where the leaves
-         stack vertically, so the rules run horizontally (0deg) instead. */
-      .rack-side {
-        top: 0;
-        bottom: 0;
-        left: auto;
-        right: auto;
-        width: calc(var(--bd) * 1em);
-        background: repeating-linear-gradient(
-          0deg,
-          var(--paper) 0 1.5px,
-          var(--hairline) 1.5px 3px
-        );
-        box-shadow: inset 0 0 6px rgba(2, 5, 14, 0.55);
-      }
-      .rack-side-l {
-        left: 0;
-        transform-origin: 0 50%;
-        transform: rotateY(90deg);
-      }
-      .rack-side-r {
-        right: 0;
-        transform-origin: 100% 50%;
-        transform: rotateY(-90deg);
-      }
-      .rack-spine {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        writing-mode: vertical-rl;
-        transform: rotate(180deg);
-        font-family: var(--font);
-        font-size: 0.72em;
-        font-weight: 500;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        /* Dark stamping on the light cover board, the way a real bookcloth
-           volume is blocked: cream type on these lifted accents was only
-           ~2.5:1 and read as a smudge. The pale top highlight is the deboss. */
-        color: rgba(16, 23, 43, 0.88);
-        text-shadow: 0 1px 0 rgba(244, 237, 221, 0.22);
-        white-space: nowrap;
-        overflow: hidden;
-      }
-      /* The board the volumes stand on: a real floor plane, laid flat by
-         rotating it 90deg about its own bottom edge, so its near edge stays
-         at the books' feet and the board recedes backward under them in the
-         row's own camera. The earlier build used an un-rotated gradient
-         strip, which is not a floor at all — nothing in the scene receded
-         downward, so the books looked pasted onto the wall. */
-      .rack-shelf {
-        position: absolute;
-        left: 50%;
-        bottom: 0;
-        width: 118%;
-        height: 11em;
-        transform: translateX(-50%) rotateX(90deg);
-        transform-origin: 50% 100%;
-        pointer-events: none;
-        z-index: 0;
-        background:
-          linear-gradient(0deg, rgba(2, 5, 14, 0.5), rgba(2, 5, 14, 0) 58%),
-          radial-gradient(
-            72% 62% at 50% 100%,
-            rgba(2, 5, 14, 0.6),
-            rgba(2, 5, 14, 0) 70%
-          );
-      }
-      .rack-row {
-        position: relative;
-        z-index: 1;
-      }
-      .rack-shelf::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 0;
-        height: 1px;
-        background: linear-gradient(
-          90deg,
-          transparent,
-          rgba(198, 160, 83, 0.22) 12%,
-          rgba(198, 160, 83, 0.4) 50%,
-          rgba(198, 160, 83, 0.22) 88%,
-          transparent
-        );
-      }
-      /* Under reduced motion the rack never plays, so it must not be on screen
-         either — playRack() is skipped entirely (see initIntroStage) and the
-         cover goes straight to the riffle. Belt and braces: hide it here too. */
-      @media (prefers-reduced-motion: reduce) {
-        .rack {
-          display: none;
-        }
-      }
-      /* ---- "Skip intro" chip ----------------------------------------------
-         The universal skip (any key, pointer, touch or wheel) is invisible by
-         design, so a visitor who simply does not want to wait has nothing to
-         aim at. This is the visible affordance: a quiet tracked-caps text chip
-         in the corner, styled like the page's other micro-labels rather than a
-         loud button, because the intro is meant to be watched, not dismissed.
-         It is a SIBLING of .intro-stage, not a child, because the stage is
-         aria-hidden (the books are decorative) and an aria-hidden ancestor
-         silences a focusable button for assistive tech. Sitting outside means
-         it must clear the stage's own z-index (9999) to stay on top, and it is
-         removed by removeNow() rather than by the stage's teardown. */
-      .rack-skip {
+      /* ---- "Continue to the archive" button --------------------------------
+         The entrance resolves onto the portrait plate and then HOLDS: the
+         cover no longer lifts on a timer, because a reveal that vanishes the
+         instant it finishes reads as a flash. This is the single visible
+         control that carries the visitor from the entrance into the page, so
+         the reveal is read at the visitor's own pace. It is a SIBLING of
+         .intro-stage (which is aria-hidden), so it stays announced for
+         assistive tech; dismiss() removes it with the stage. Styled as a quiet
+         tracked-caps chip that fills with the page's ink on hover — the same
+         micro-label language as the rest of the site. */
+      .intro-continue {
         position: fixed;
-        right: clamp(14px, 3vw, 32px);
-        top: clamp(14px, 3vh, 32px);
+        left: 50%;
+        bottom: clamp(30px, 7vh, 74px);
+        transform: translateX(-50%);
         z-index: 10001;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.7em;
         appearance: none;
         -webkit-appearance: none;
         background: transparent;
-        border: 0;
-        border-bottom: 1px solid var(--hairline);
-        padding: 7px 1px;
+        border: 1px solid var(--hairline);
+        border-radius: 999px;
+        padding: 11px 24px;
         cursor: pointer;
         font-family: var(--font);
         font-size: clamp(10px, 0.95vw, 12px);
         letter-spacing: var(--track-caps);
         text-transform: uppercase;
         color: var(--ink-soft-text);
-        transition: color 0.18s ease, border-color 0.18s ease;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.6s ease, visibility 0.6s ease,
+          color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
       }
-      .rack-skip:hover,
-      .rack-skip:focus-visible {
-        color: var(--ink);
-        border-color: var(--ink);
+      .intro-continue.is-on {
+        opacity: 1;
+        visibility: visible;
+      }
+      .intro-continue .intro-continue-arrow {
+        font-size: 1.15em;
+        line-height: 1;
+        transition: transform 0.2s ease;
+      }
+      .intro-continue:hover,
+      .intro-continue:focus-visible {
+        color: var(--accent-ink);
+        background: var(--accent-text);
+        border-color: var(--accent-text);
         outline: none;
+      }
+      .intro-continue:hover .intro-continue-arrow,
+      .intro-continue:focus-visible .intro-continue-arrow {
+        transform: translateX(3px);
+      }
+      /* The entrance holds indefinitely, so under reduced motion the button is
+         the ONLY way through the cover: it must be visible from the start. */
+      @media (prefers-reduced-motion: reduce) {
+        .intro-continue {
+          opacity: 1;
+          visibility: visible;
+          transition: none;
+        }
+      }
+      .intro-continue.is-gone {
+        opacity: 0;
+        visibility: hidden;
       }
 
       /* =====================================================================
@@ -2919,59 +2609,30 @@
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
-    <!-- Entrance: Five Plates -> Book Settle.
+    <!-- Entrance: Five Plates -> Portrait Hold -> Continue.
          The five real sketchbook spreads fly in from the wings, fan like a deck
-         of archival prints, then settle onto #sbBook and cross-fade into the
-         real book, while the name hot-stamps over the top. The riffle is fired
-         from this same timeline (see initIntroStage) instead of a wall-clock
-         setTimeout, so the payoff can never play hidden behind the cover.
-         Entirely dependency-free (Web Animations API + CSS) and self-dismissing,
-         so a blocked CDN cannot strand it. -->
-    <!-- Entrance, phase 1: the rack. A shelf of sketchbooks drawn from the
-         site's tokens (no images — a row of thirty costs 0 KB), seating the
-         five real projects in the middle. Each book lifts out in turn while
-         the panel names it, then phase 2 (the existing five-plate riffle)
-         takes over. .rack-row is filled by playRack() so the same builder can
-         re-generate it at any width. aria-hidden on the whole cover: the
-         books are decorative, and the panel is echoed by .intro-stamp. The
-         Skip chip is deliberately kept OUTSIDE this subtree — an aria-hidden
-         ancestor hides a focusable button from assistive tech even though it
-         stays in the tab order, so the one control a keyboard user can reach
-         would otherwise be silent. -->
-    <!-- Visible escape hatch for the cover. The universal skip (any key,
-         pointer, touch, wheel) already works; this is the affordance a
-         visitor can actually see and aim at. It is a sibling of the stage,
-         not a child, so it is announced; the teardown removes it with the
-         stage (dismiss() → removeNow()). -->
-    <button class="rack-skip" id="introSkipBtn" type="button">
-      Skip intro
+         of archival prints, riffle down onto the book, and then resolve to ONE
+         held plate — the portrait — while the name and role hot-stamp over
+         it. The cover does NOT lift on a timer: it holds on the portrait until
+         the visitor presses Continue, which fires the riffle and hands the page
+         over, so the reveal is read at the visitor's own pace rather than
+         flashing past. The portrait plate is LAST in the deck's DOM order, so
+         it is the top of the pile and the plate left showing is the profile,
+         not a project. Entirely dependency-free (Web Animations API + CSS);
+         the Continue button is the one guaranteed exit even if the CDN hangs.
+         aria-hidden on the whole cover: the plates are decorative and the name
+         is echoed by the page's own <h1>. -->
+    <!-- Visible "continue" affordance. It is a sibling of the stage, not a
+         child, because the stage is aria-hidden and an aria-hidden ancestor
+         would silence a focusable button for assistive tech; the teardown
+         removes it with the stage (dismiss() → removeNow()). -->
+    <button class="intro-continue" id="introContinueBtn" type="button">
+      Continue to the archive
+      <span class="intro-continue-arrow" aria-hidden="true">→</span>
     </button>
     <div class="intro-stage" id="introStage" aria-hidden="true">
-      <div class="rack" id="introRack">
-        <div class="rack-panel">
-          <p class="rack-kicker"></p>
-          <p class="rack-title"></p>
-          <p class="rack-meta"></p>
-        </div>
-        <div class="rack-scene">
-          <div class="rack-stage">
-            <div class="rack-shelf"></div>
-            <div class="rack-row" id="introRackRow"></div>
-          </div>
-        </div>
-      </div>
       <div class="intro-deck" id="introDeck">
         <div class="intro-plate" style="--i: 0">
-          <img
-            src="/chin-portfolio/portrait-intro.webp"
-            alt=""
-            width="440"
-            height="248"
-            decoding="async"
-            fetchpriority="high"
-          />
-        </div>
-        <div class="intro-plate" style="--i: 1">
           <img
             src="/chin-portfolio/aethercast.webp"
             alt=""
@@ -2980,7 +2641,7 @@
             decoding="async"
           />
         </div>
-        <div class="intro-plate" style="--i: 2">
+        <div class="intro-plate" style="--i: 1">
           <img
             src="/chin-portfolio/starwars-ar.webp"
             alt=""
@@ -2989,7 +2650,7 @@
             decoding="async"
           />
         </div>
-        <div class="intro-plate" style="--i: 3">
+        <div class="intro-plate" style="--i: 2">
           <img
             src="/chin-portfolio/moneyflow.webp"
             alt=""
@@ -2998,13 +2659,23 @@
             decoding="async"
           />
         </div>
-        <div class="intro-plate" style="--i: 4">
+        <div class="intro-plate" style="--i: 3">
           <img
             src="/chin-portfolio/schedule-organizer.webp"
             alt=""
             width="440"
             height="248"
             decoding="async"
+          />
+        </div>
+        <div class="intro-plate" style="--i: 4">
+          <img
+            src="/chin-portfolio/portrait-intro.webp"
+            alt=""
+            width="440"
+            height="248"
+            decoding="async"
+            fetchpriority="high"
           />
         </div>
       </div>
@@ -3105,7 +2776,11 @@
       <section id="sketchbook" class="hero">
         <img
           class="botany l"
-          src="/chin-portfolio/botany-left.png"
+          src="/chin-portfolio/botany-left-250.webp"
+          srcset="/chin-portfolio/botany-left-250.webp 250w, /chin-portfolio/botany-left-500.webp 500w"
+          sizes="min(250px, 15vw)"
+          width="500"
+          height="693"
           alt=""
           aria-hidden="true"
           decoding="async"
@@ -3113,7 +2788,11 @@
         />
         <img
           class="botany r"
-          src="/chin-portfolio/botany-right.png"
+          src="/chin-portfolio/botany-right-200.webp"
+          srcset="/chin-portfolio/botany-right-200.webp 200w, /chin-portfolio/botany-right-400.webp 400w"
+          sizes="min(200px, 12vw)"
+          width="400"
+          height="1013"
           alt=""
           aria-hidden="true"
           decoding="async"
@@ -3121,7 +2800,11 @@
         />
         <img
           class="orn orn-colonnade"
-          src="/chin-portfolio/engraved/colonnade.webp"
+          src="/chin-portfolio/engraved/colonnade-450.webp"
+          srcset="/chin-portfolio/engraved/colonnade-450.webp 450w, /chin-portfolio/engraved/colonnade-736.webp 736w"
+          sizes="450px"
+          width="736"
+          height="1472"
           alt=""
           aria-hidden="true"
           decoding="async"
@@ -3129,7 +2812,11 @@
         />
         <img
           class="orn orn-clouds"
-          src="/chin-portfolio/engraved/sky-clouds.webp"
+          src="/chin-portfolio/engraved/sky-clouds-462.webp"
+          srcset="/chin-portfolio/engraved/sky-clouds-462.webp 462w, /chin-portfolio/engraved/sky-clouds-923.webp 923w"
+          sizes="462px"
+          width="923"
+          height="1641"
           alt=""
           aria-hidden="true"
           decoding="async"
@@ -3301,7 +2988,11 @@
         />
         <img
           class="orn orn-archer"
-          src="/chin-portfolio/engraved/archer.webp"
+          src="/chin-portfolio/engraved/archer-186.webp"
+          srcset="/chin-portfolio/engraved/archer-186.webp 186w, /chin-portfolio/engraved/archer-372.webp 372w"
+          sizes="min(186px, 12vw)"
+          width="372"
+          height="732"
           alt=""
           aria-hidden="true"
           decoding="async"
@@ -3635,7 +3326,11 @@
     <footer class="site-foot">
       <img
         class="orn orn-ruins"
-        src="/chin-portfolio/engraved/ruins.webp"
+        src="/chin-portfolio/engraved/ruins-460.webp"
+        srcset="/chin-portfolio/engraved/ruins-460.webp 460w, /chin-portfolio/engraved/ruins-675.webp 675w"
+        sizes="min(460px, 30vw)"
+        width="675"
+        height="770"
         alt=""
         aria-hidden="true"
         decoding="async"
@@ -5834,7 +5529,8 @@
             return;
           }
           /* The entrance stage owns the intro from here on — see initIntroStage()
-             below, which fires startIntro() from its timeline's onComplete. */
+             below, which resolves onto the portrait plate and holds there until
+             the Continue button (enterPage) fires the riffle. */
         })();
 
         /* =====================================================================
@@ -5853,8 +5549,9 @@
 
    The timeline also fixes a second, quieter bug: the riffle used to fire from
    a wall-clock `setTimeout(startIntro, 1150)` while the cover was still fully
-   opaque, so the riffle always played hidden behind it. Now the riffle is
-   fired from the timeline's onComplete, exactly when the cover lifts.
+   opaque, so the riffle always played hidden behind it. Now the entrance
+   resolves onto the portrait plate and holds, and the riffle fires from the
+   Continue button's click (enterPage) once the visitor chooses to go on.
 
    Dependency-free by design: GSAP when it is available, a Web Animations
    fallback when it is not, and a hard backstop timer in both. */
@@ -5891,6 +5588,9 @@
               ".intro-kicker, .intro-name, .intro-role, .intro-index",
             ),
           );
+          /* The visible "continue" affordance (a sibling of the stage, so it is
+             not silenced by the stage's aria-hidden). Resolved once here. */
+          const continueBtn = document.getElementById("introContinueBtn");
 
           let closed = false;
           let introStarted = false;
@@ -5906,13 +5606,6 @@
             backstopId: 0,
             started: false,
             closed: false,
-            /* Rack bookkeeping (phase 1). `rackBackstopId` is its own timer so
-               dismiss()/release() can kill it; `rackDone` is the latch the
-               post-CDN runner waits on, and `pendingUpgrade` is the GSAP
-               builder it parks there when it arrives mid-rack. */
-            rackBackstopId: 0,
-            rackDone: false,
-            pendingUpgrade: null,
           };
 
           function startRiffle() {
@@ -5936,16 +5629,16 @@
             window.removeEventListener("wheel", onSkip, true);
             window.removeEventListener("resize", onFallbackResize);
             if (ctl.onResize) window.removeEventListener("resize", ctl.onResize);
-            if (ctl.rackBackstopId) clearTimeout(ctl.rackBackstopId);
           }
 
           function removeNow() {
             if (stage.parentNode) stage.parentNode.removeChild(stage);
-            /* The Skip chip is a sibling of the stage (it must not sit under
-               aria-hidden), so removing the stage no longer takes it along.
-               It is removed here instead, on every path that drops the cover. */
-            if (rackSkipBtn && rackSkipBtn.parentNode) {
-              rackSkipBtn.parentNode.removeChild(rackSkipBtn);
+            /* The Continue button is a sibling of the stage (it must not sit
+               under aria-hidden), so removing the stage no longer takes it
+               along. It is removed here instead, on every path that drops the
+               cover. */
+            if (continueBtn && continueBtn.parentNode) {
+              continueBtn.parentNode.removeChild(continueBtn);
             }
           }
 
@@ -5954,7 +5647,6 @@
             ctl.closed = true;
             clearTimeout(backstop);
             clearTimeout(ctl.backstopId);
-            clearTimeout(ctl.rackBackstopId);
             if (ctl.tl) {
               try {
                 ctl.tl.kill();
@@ -5964,21 +5656,21 @@
             }
             release();
             stage.classList.add("is-gone");
-            /* The chip is a sibling of the stage (it must not sit under
+            /* The button is a sibling of the stage (it must not sit under
                aria-hidden), so it does not inherit the stage's .is-gone fade.
                Fade it with the same 340ms the stage uses on the animated path
                so the two leave together; the instant path hides it outright
                and removeNow() takes it out of the DOM. */
-            if (rackSkipBtn) {
+            if (continueBtn) {
               if (instant) {
-                rackSkipBtn.style.display = "none";
-              } else if (rackSkipBtn.animate) {
-                rackSkipBtn.animate(
+                continueBtn.style.display = "none";
+              } else if (continueBtn.animate) {
+                continueBtn.animate(
                   [{ opacity: 1 }, { opacity: 0 }],
                   { duration: 340, easing: "ease-out", fill: "forwards" },
                 );
               } else {
-                rackSkipBtn.style.display = "none";
+                continueBtn.style.display = "none";
               }
             }
             if (instant) removeNow();
@@ -5995,330 +5687,23 @@
             dismiss(false);
           }
 
-          /* ===================================================================
-             Phase 1 — the rack.
-
-             A shelf of sketchbooks, built in JS (the page has no static markup
-             for them: the row is generated so one builder can lay it out at any
-             width) and drawn purely from tokens, so the whole row costs no
-             image bytes. The shelf holds the FIVE real projects and nothing
-             else — the portrait cover plus the four case studies — so every
-             book that lifts out is one the panel can name, and the rack is a
-             true index of the work rather than a row of decorative filler.
-             (It ran as a longer 13-volume shelf with filler spines; at five
-             volumes each book is roughly half again as wide, so the row reads
-             as a display shelf rather than a shelf-edge of spines.)
-
-             Authored in the Web Animations API, not GSAP, on purpose: it lives
-             here in the pre-CDN block beside startIntro(), so the rack -> riffle
-             hand-off is one sequence with one backstop, and a blocked CDN
-             cannot strand it (initIntroUpgrade only ever swaps the plates).
-
-             Each book is a real preserve-3d box — cover, back board, page
-             block and both fore-edges — and the shell carries both its
-             perspective seat and its lift, so a volume that rises out of the
-             row keeps its full thickness while it moves. */
-          const RACK_BOOKS = [
-            /* The five real projects, in PAGES order. No filler: the shelf is
-               exactly the archive, so the panel's last name is the riffle's
-               first plate and the hand-off reads as one continuous index. */
-            { kicker: "Cover · Portrait", title: PAGES[0].title, meta: PAGES[0].place, accent: 0 },
-            { kicker: "Project · 01", title: PAGES[1].title, meta: PAGES[1].place, accent: 1 },
-            { kicker: "Project · 02", title: PAGES[2].title, meta: PAGES[2].place, accent: 2 },
-            { kicker: "Project · 03", title: PAGES[3].title, meta: PAGES[3].place, accent: 3 },
-            { kicker: "Project · 04", title: PAGES[4].title, meta: PAGES[4].place, accent: 4 },
-          ];
-
-          const rackEl = document.getElementById("introRack");
-          const rackRow = document.getElementById("introRackRow");
-          const rackSkipBtn = document.getElementById("introSkipBtn");
-          const rackKicker = rackEl ? rackEl.querySelector(".rack-kicker") : null;
-          const rackTitle = rackEl ? rackEl.querySelector(".rack-title") : null;
-          const rackMeta = rackEl ? rackEl.querySelector(".rack-meta") : null;
-
-          /* Per-index seat geometry. The depth now comes from the stage's own
-             yaw (see .rack-stage): one rotation of the whole row turns every
-             book the same way, so the shelf recedes as a single straight
-             plane instead of a fan curving away at both ends.
-
-             All the seat has to add is a SLIGHT fan, so the volumes are not
-             five parallel slabs, and a small depth step so the recession is
-             graded rather than a single flat tilt. `o` is the slot offset
-             from the middle in books (-2..2 with five volumes), so `-o * 1.1`
-             gives the ends ±2.2deg — a gentle, non-uniform splay well inside
-             the brief's rotateY -8..8 per book, which the stage yaw then
-             carries the rest of the way. `tz` steps each book back by its
-             distance from centre so the size falloff is monotonic: no book is
-             ever wider than one nearer the middle.
-
-             `ty` is the one non-obvious term. A yawed row in perspective
-             drops its far end: the books further from the camera sit higher
-             on screen, so the row slopes instead of standing. The yaw is
-             one-directional, so the correction is too — `o * 2.17` (a SIGNED
-             ramp, not a symmetric one) pushes the near books up and the far
-             books down by exactly the amount the yaw lifted them, which
-             levels all five feet onto one shelf line while the tops still
-             converge. It scales with the row's em, so it holds at every
-             width. */
-          function seatFor(i, n) {
-            const mid = (n - 1) / 2;
-            const o = i - mid; // <0 = left of centre
-            const a = mid ? Math.abs(o) / mid : 0; // 0 .. 1, for depth/shrink
-            return {
-              ry: (-o * 1.1).toFixed(2) + "deg",
-              tz: (-a * 2.4).toFixed(2),
-              ty: (o * 2.17).toFixed(2),
-              sc: "1",
-              z: String(n - i),
-            };
+          /* ---- the entrance hand-off -----------------------------------------
+             The plate sequence settles on the portrait plate and HOLDS: the
+             cover no longer lifts on a timer, because a reveal that vanishes
+             the instant it finishes reads as a flash. `continueReady` gates
+             the Continue button so it cannot fire before there is something to
+             continue from; `enterPage()` is the one path out — it fires the
+             riffle (so the sketchbook still turns to the archive) and lifts the
+             cover. Both the GSAP timeline and the WAAPI fallback call
+             `resolveIntro()` when they settle. */
+          let continueReady = false;
+          function resolveIntro() {
+            continueReady = true;
+            if (continueBtn) continueBtn.classList.add("is-on");
           }
-
-          /* One source of truth for a book's resting transform: the CSS rule
-             and the WAAPI lift keyframes both build it from here, so the
-             animation can never settle at a subtly different seat than the
-             static row (which is exactly what happened when the seat lived on
-             the front face and the lift ran on the shell). */
-          function seatTf(s) {
-            return (
-              "rotateY(" + s.ry + ") translateZ(" + s.tz + "em) translateY(" +
-              s.ty + "em) scale(" + s.sc + ")"
-            );
-          }
-
-          function buildRack() {
-            if (!rackRow) return [];
-            rackRow.innerHTML = "";
-            const n = RACK_BOOKS.length;
-            return RACK_BOOKS.map(function (b, i) {
-              const seat = seatFor(i, n);
-              const shell = document.createElement("div");
-              shell.className = "rack-book";
-              /* Five volumes, each a little different in height and
-                 thickness so the row does not read as five identical slabs.
-                 The widths are NOT jittered: width is the one dimension the
-                 eye reads as distance, so the widths must step down
-                 monotonically from the centre or the recession breaks. The
-                 z-index is the seat's depth order plus a constant, which
-                 leaves room for the lift to raise a volume above its
-                 neighbours (see playRack) — a lifted book that paints UNDER
-                 the ghosted books it rose past reads as see-through. */
-              shell.style.setProperty("--bw", b.bw.toFixed(2));
-              shell.style.setProperty("--bh", b.bh.toFixed(2));
-              shell.style.setProperty("--bd", b.bd.toFixed(2));
-              shell.style.setProperty("--ry", seat.ry);
-              shell.style.setProperty("--tz", seat.tz);
-              shell.style.setProperty("--ty", seat.ty);
-              shell.style.setProperty("--sc", seat.sc);
-              shell.style.setProperty("--bk", b.ink);
-              shell.style.setProperty("--bk2", b.ink2);
-              shell.style.zIndex = String(10 + (n - i));
-              shell.style.transformOrigin = "50% 100%";
-
-              const front = document.createElement("div");
-              front.className = "rack-f rack-front";
-              const back = document.createElement("div");
-              back.className = "rack-f rack-back";
-              const top = document.createElement("div");
-              top.className = "rack-f rack-top";
-              const sideL = document.createElement("div");
-              sideL.className = "rack-f rack-side rack-side-l";
-              const sideR = document.createElement("div");
-              sideR.className = "rack-f rack-side rack-side-r";
-
-              const spine = document.createElement("span");
-              spine.className = "rack-spine";
-              spine.textContent = b.title;
-              front.appendChild(spine);
-
-              shell.appendChild(back);
-              shell.appendChild(sideL);
-              shell.appendChild(sideR);
-              shell.appendChild(top);
-              shell.appendChild(front);
-              rackRow.appendChild(shell);
-              return { shell: shell, data: b, seat: seat, z: 10 + (n - i) };
-            });
-          }
-
-          /* Named books get their own project accent; the filler volumes get
-             the earth tone at one of a few depths, so the row has quiet
-             variation without thirty competing hues.
-
-             The fills are OPAQUE. The accent colours in ACCENTS are the
-             engraved-night tones, right for the dark ground but still
-             composited here onto the page's own ground so the board is a flat
-             solid with no alpha left in it — a translucent cover would let the
-             wash behind the rack bleed straight through the book. */
-          const PAPER = [11, 17, 32]; // --ground, as numbers
-          function opaque(hex, alpha) {
-            const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-            if (!m) return hex;
-            const c = [1, 2, 3].map(function (k) {
-              return Math.round(
-                parseInt(m[k], 16) * alpha + PAPER[k - 1] * (1 - alpha),
-              );
-            });
-            return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
-          }
-          const BK_DIM = [0.9, 0.62, 0.62, 0.9, 0.62]; // per-slot height jitter
-          function paintBook(b, i) {
-            /* Height and thickness vary so the five are not identical slabs;
-               width is left to the seat's perspective scale alone. */
-            b.bw = 10.8;
-            b.bh = 13.4 + BK_DIM[i % BK_DIM.length] * 1.4;
-            b.bd = 3.3 + (i % 2) * 0.5;
-            if (b.accent >= 0 && ACCENTS[b.accent]) {
-              b.ink = opaque(ACCENTS[b.accent].dec, 0.9);
-              b.ink2 = opaque(ACCENTS[b.accent].text, 0.94);
-              b.real = true;
-            } else {
-              b.ink = "#C6A053";
-              b.ink2 = "#9A7B3E";
-              b.real = false;
-            }
-            return b;
-          }
-          RACK_BOOKS.forEach(paintBook);
-
-          /* ---- the lift-out sequence ---- */
-          /* Five lifts, tightened so the whole shelf resolves in ~2.0s, with
-             the five-plate riffle still following after it. A 340ms step
-             against a 560ms lift keeps roughly one-and-a-half volumes
-             airborne at a time, which reads as a relay rather than a pile-up.
-             `t` starts at 420, not 0, so the intact shelf is on screen for a
-             beat before the first volume moves — the establishing shot the
-             earlier build never had. */
-          const RACK_LIFT = 400; // ms one book is out of the row
-          const RACK_STEP = 340; // ms between successive lifts
-          const RACK_DUR = RACK_LIFT + 160; // full length of one lift animation
-          const RACK_PEAK = Math.round(RACK_DUR * 0.42); // inside the hold plateau
-          const RACK_FADE = 160; // ms the naming panel takes to cross-fade
-          let rackPlayed = false;
-
-          function playRack(done) {
-            if (rackPlayed) { done(); return; }
-            rackPlayed = true;
-            const books = buildRack();
-            if (!rackEl || !books.length) { done(); return; }
-            rackEl.classList.add("is-on");
-
-            const realIdx = [];
-            books.forEach(function (b, i) { if (b.data.real) realIdx.push(i); });
-
-            /* Neighbour dim: the shelf steps back so the one volume the panel
-               is naming is the only thing at full strength. Exactly one book
-               is lit at a time and the swap happens at each book's PEAK — the
-               same instant the panel changes — so the lit book and the named
-               book can never disagree, even though two volumes are airborne
-               at once. Before the first peak the whole row is at full
-               strength (the intact shelf is the establishing shot); after the
-               last volume settles, the row comes back up for the hand-off. */
-            function setLit(idx) {
-              books.forEach(function (o, j) {
-                /* A negative index means "no book is being named" — the whole
-                   shelf comes back to full strength (the establishing shot
-                   before the first lift, and the hand-off after the last). */
-                o.shell.classList.toggle("is-dim", idx >= 0 && j !== idx);
-              });
-            }
-
-            let t = 420;
-            realIdx.forEach(function (i, k) {
-              const b = books[i];
-              const delay = t;
-              /* The panel names this book as it REACHES its peak, not as it
-                 leaves the row. Firing at the start of the lift (delay + 60)
-                 put the next title on screen while the previous volume was
-                 still up in the air, so the panel and the book disagreed about
-                 which one was being named. A lift runs RACK_DUR (720 ms) but
-                 steps every RACK_STEP (300 ms), so two volumes are always in
-                 the air at once; firing early just names the new book while
-                 the PREVIOUS one is still near its peak. The panel therefore
-                 changes exactly at this book's peak, and its 200 ms cross-fade
-                 resolves while the book hangs elevated, which is what makes
-                 the name feel attached to the volume that is up. The dim swap
-                 below rides the same instant, so "which book is lit" and
-                 "which book is named" are the same fact. */
-              setTimeout(function () {
-                if (ctl.closed) return;
-                setLit(i);
-                if (rackKicker) rackKicker.textContent = b.data.kicker;
-                if (rackTitle) rackTitle.textContent = b.data.title;
-                if (rackMeta) rackMeta.textContent = b.data.meta;
-                [rackTitle, rackMeta].forEach(function (el) {
-                  if (!el || !el.animate) return;
-                  /* Never fade to nothing: the panel is the only thing naming
-                     the book, so a full 0->1 fade leaves it blank for the first
-                     frames of every change. It dips to 0.2 and rises back, so
-                     a name is always legible. */
-                  el.animate(
-                    [
-                      { opacity: 0.2, transform: "translateY(7px)" },
-                      { opacity: 1, transform: "translateY(0)" },
-                    ],
-                    { duration: RACK_FADE, easing: "ease-out", fill: "forwards" },
-                  );
-                });
-              }, delay + RACK_PEAK);
-
-              /* The whole box lifts — the shell carries the seat AND the
-                 animation, so a lifted book keeps its thickness, its top
-                 block and both fore-edges. It comes FORWARD as well as up,
-                 which is what makes it read as a volume drawn out of the row
-                 rather than a card slid upward.
-
-                 Three details matter. The forward push is ABSOLUTE (+5.5em),
-                 not relative to the book's own seat: a seat-relative push
-                 left the outer books — which start 2.4em back — still behind
-                 the row plane, so their lift barely popped. The yaw is kept
-                 (scaled to 45%), not zeroed: squaring the book up to the
-                 camera at its peak would hide the fore-edge at exactly the
-                 moment it is most legible. And the four keyframes put a HOLD
-                 between 34% and 62%, because a plain up-and-down V reverses
-                 at maximum velocity, so the book never actually hangs and the
-                 panel's cross-fade fires on a moving target. The plateau gives
-                 it ~155ms stationary to be named. The options easing is
-                 linear so the per-keyframe easings are the only curve. */
-              const liftSc = (parseFloat(b.seat.sc) + 0.05).toFixed(3);
-              const peakRy = (parseFloat(b.seat.ry) * 0.45).toFixed(2) + "deg";
-              const peak =
-                "rotateY(" + peakRy + ") translateZ(5.5em) translateY(" +
-                (parseFloat(b.seat.ty) - 11.5).toFixed(2) + "em) scale(" +
-                liftSc + ")";
-              b.shell.animate(
-                [
-                  { transform: seatTf(b.seat), offset: 0, easing: "cubic-bezier(0.16,1,0.3,1)" },
-                  { transform: peak, offset: 0.34, easing: "linear" },
-                  { transform: peak, offset: 0.62, easing: "cubic-bezier(0.45,0,0.2,1)" },
-                  { transform: seatTf(b.seat), offset: 1 },
-                ],
-                { duration: RACK_DUR, delay: delay, easing: "linear", fill: "both" },
-              );
-              t += RACK_STEP;
-            });
-
-            /* Everything settles, the shelf fades, phase 2 takes the stage.
-               The tail is measured from the LAST lift, not from the loop
-               counter: `t` has already been advanced past the final book, so
-               `t + RACK_LIFT` double-counted and left a beat of dead air. */
-            const total = (realIdx.length - 1) * RACK_STEP + RACK_DUR + 260;
-            ctl.rackBackstopId = setTimeout(function () {
-              if (ctl.closed) return;
-              if (rackEl) rackEl.classList.add("is-out");
-              /* The last volume settles back into a full-strength shelf
-                 before the cover lifts, so the rack is handed to the riffle
-                 intact rather than half-dimmed. */
-              setLit(-1);
-              if (rackEl && rackEl.animate) {
-                const a = rackEl.animate(
-                  [{ opacity: 1 }, { opacity: 0 }],
-                  { duration: 300, easing: "ease-out", fill: "forwards" },
-                );
-                a.finished.then(done, done);
-              } else {
-                done();
-              }
-            }, total);
+          function enterPage() {
+            startRiffle();
+            dismiss(false);
           }
 
           /* ---- instant paths: nothing to animate, drop the stage at once ---- */
@@ -6347,7 +5732,11 @@
              riffle — startIntro() honours both, so this is safe. */
           const QS = new URLSearchParams(location.search);
           if (QS.has("nointro") || QS.has("shot")) {
-            startRiffle();
+            introStarted = true;
+            introOn = false;
+            wrap.classList.remove("intro", "b2");
+            idx = LAND;
+            paint();
             removeNow();
             return;
           }
@@ -6372,14 +5761,15 @@
             /* no storage (private mode): the intro just plays every load */
           }
 
-          /* The visible escape hatch. It routes through the same universal
-             skip as any other input, so there is exactly one code path that
-             ends the cover, and it works whether the shelf, the riffle or the
-             GSAP upgrade is the thing on screen. */
-          if (rackSkipBtn) {
-            rackSkipBtn.addEventListener("click", function (e) {
+          /* The visible "continue" control is NOT an escape hatch: it may only
+             fire once the entrance has resolved onto the portrait plate, so it
+             is wired to the hand-off, not to onSkip. Registered here so the
+             listener exists for the whole entrance; it is a no-op until the
+             plates have settled (continueReady). */
+          if (continueBtn) {
+            continueBtn.addEventListener("click", function (e) {
               e.preventDefault();
-              onSkip(e);
+              if (continueReady) enterPage();
             });
           }
 
@@ -6403,10 +5793,29 @@
           });
 
           if (MOBILE) {
-            /* No fan on phones — the plates just fade through and the book
-               settles. Short on purpose so a tap-through never feels like a
-               stall. */
+            /* No fan on phones — the four project plates fade through, the
+               portrait plate (last in DOM order, so top of the pile) settles in
+               place and HOLDS, and the Continue button appears. Short on
+               purpose so a tap-through never feels like a stall, but the
+               entrance still ends on the profile rather than blinking straight
+               to the page. */
             plates.forEach(function (p, i) {
+              if (i === plates.length - 1) {
+                /* the portrait plate: fade in and stay */
+                p.animate(
+                  [
+                    { opacity: 0, transform: "scale(0.96)" },
+                    { opacity: 1, transform: "scale(1)" },
+                  ],
+                  {
+                    duration: 620,
+                    delay: i * 55,
+                    easing: "ease-out",
+                    fill: "forwards",
+                  },
+                );
+                return;
+              }
               p.animate(
                 [
                   { opacity: 0, transform: "scale(0.94)" },
@@ -6429,15 +5838,15 @@
                 ],
                 {
                   duration: 300,
-                  delay: 200 + i * 70,
+                  delay: 420 + i * 70,
                   easing: "ease-out",
                   fill: "forwards",
                 },
               );
             });
             backstop = setTimeout(function () {
-              startRiffle();
-              dismiss(false);
+              if (ctl.closed) return;
+              resolveIntro();
             }, 1250);
             return;
           }
@@ -6545,9 +5954,14 @@
                 },
               );
             });
+            /* The sequence resolves onto the portrait plate and the cover
+               STAYS: no dismiss here. The backstop is only the stall guard —
+               if the WAAPI sequence never finishes (tab backgrounded, an error),
+               resolveIntro() still runs so the Continue button appears rather
+               than leaving the visitor stranded. */
             ctl.backstopId = setTimeout(function () {
-              dismiss(false);
-              setTimeout(startRiffle, 280);
+              if (ctl.closed) return;
+              resolveIntro();
             }, 2700);
           }
 
@@ -6564,24 +5978,10 @@
           }
           window.addEventListener("resize", onFallbackResize);
 
-          /* The rack plays first (phase 1), and only when the shelf has
-             settled does the five-plate sequence (phase 2) run — here, or, if
-             GSAP has arrived by then, through the richer timeline the post-CDN
-             runner parks on `ctl.pendingUpgrade`. The fallback's own backstop
-             is armed at hand-off, not now, so the two phases share one clock
-             and a slow shelf cannot be cut short by the plate backstop. */
-          function afterRack() {
-            ctl.rackDone = true;
-            if (rackEl) {
-              rackEl.classList.add("is-out");
-              rackEl.style.visibility = "hidden";
-            }
-            const upgrade = ctl.pendingUpgrade;
-            ctl.pendingUpgrade = null;
-            if (upgrade) upgrade();
-            else runFallback();
-          }
-          playRack(afterRack);
+          /* The five-plate sequence is the whole entrance: run it now. The
+             post-CDN runner replaces this WAAPI fallback with the richer GSAP
+             timeline a moment later, the moment `gsap` is defined. */
+          runFallback();
 
           /* Handed to the post-CDN runner: it either replaces the fallback with
              the GSAP timeline, or (gsap blocked) leaves the fallback standing.
@@ -6593,6 +5993,7 @@
             flipFor: flipFor,
             dismiss: dismiss,
             startRiffle: startRiffle,
+            resolveIntro: resolveIntro,
             ctl: ctl,
           };
         })();
@@ -7266,13 +6667,12 @@
         });
         if (alreadyShowing) return;
 
-        /* The plate sequence is phase 2: it may only be built once phase 1
-           (the rack) has left the stage. `gsap.set(plates, {opacity:0})` below
-           would otherwise wipe the WAAPI fallback's fill and leave the plates
-           invisible for the rest of the rack. So if the shelf is still playing
-           when GSAP arrives, park the builder on `ctl` and let the rack's
-           hand-off (afterRack) call it; if the rack has already settled, build
-           it now. */
+        /* The plate sequence is the whole entrance now (the rack is gone), so
+           this runner replaces the WAAPI fallback the moment GSAP arrives.
+           `gsap.set(plates, {opacity:0})` below wipes the fallback's fill, so
+           the fallback's animations and its stall-guard timer are cancelled
+           first (immediately below) and the GSAP timeline takes the sequence
+           over from the top. */
         function buildUpgrade() {
         /* Cancel the fallback: stop its WAAPI animations and its backstop, so
            the two animations cannot fight over the same transform. */
@@ -7289,11 +6689,12 @@
         gsap.set(stampEls, { opacity: 0 });
 
         const tl = gsap.timeline({
+          /* The entrance resolves onto the portrait plate and HOLDS: the cover
+             is no longer lifted on the timeline's completion. The Continue
+             button (wired to enterPage) is what fires the riffle and lifts it,
+             so the reveal is read at the visitor's own pace. */
           onComplete: function () {
-            dismiss(false);
-            /* let the cover finish fading before the riffle plays, so the
-               first page turn is not half-hidden behind it */
-            setTimeout(startRiffle, 280);
+            ctl.resolveIntro();
           },
         });
         ctl.ctl.tl = tl; // dismiss() can now kill this exact timeline
@@ -7388,34 +6789,55 @@
         ctl.ctl.onResize = onIntroResize;
         window.addEventListener("resize", onIntroResize);
 
-        /* 4. cross-fade the settled stack into the real book */
-        tl.to(plates, { opacity: 0, duration: 0.32, ease: "power1.out" }, 1.75);
+        /* 4. the stack resolves down to ONE plate — the portrait — which
+           stays on screen as the entrance's held image. The four project
+           spreads clear out (staggered, so it reads as a riffle ending rather
+           than a stack blinking off); the portrait is deliberately left
+           untouched, so the plate the visitor is left looking at is the
+           profile, not a project. The portrait is LAST in DOM order, so it is
+           already the top of the pile. */
+        plates.forEach(function (p, i) {
+          if (i === plates.length - 1) return; // the portrait plate stays
+          tl.to(
+            p,
+            {
+              opacity: 0,
+              scale: 0.94,
+              duration: 0.34,
+              ease: "power1.out",
+            },
+            1.72 + i * 0.04,
+          );
+        });
 
-        /* 5. hot-stamp the name over the top */
+        /* 5. hot-stamp the name and the role over the held portrait */
         tl.fromTo(
           ".intro-name",
           { opacity: 0, scale: 1.06 },
           { opacity: 1, scale: 1, duration: 0.38, ease: "back.out(1.8)" },
-          1.82,
+          1.94,
         );
         tl.fromTo(
           ".intro-kicker, .intro-role, .intro-index",
           { opacity: 0, y: 8 },
           { opacity: 1, y: 0, duration: 0.32, ease: "power2.out", stagger: 0.05 },
-          1.94,
+          2.04,
         );
 
         /* Backstop: if the timeline never completes (tab backgrounded, an error
-           mid-run), the cover still lifts and the riffle still fires. */
+           mid-run), the cover still resolves so the Continue button appears
+           rather than leaving the visitor stranded. */
         ctl.ctl.backstopId = setTimeout(function () {
-          startRiffle();
-          dismiss(false);
+          if (ctl.ctl.closed) return;
+          ctl.resolveIntro();
         }, 2500);
         } /* end buildUpgrade() */
 
-        /* Wait for the rack before replacing the fallback. */
-        if (ctl.ctl.rackDone) buildUpgrade();
-        else ctl.ctl.pendingUpgrade = buildUpgrade;
+        /* The rack is gone, so there is nothing to wait for: build the richer
+           timeline now, replacing the WAAPI fallback that started a moment ago
+           (the "first refusal" check above has already bowed out if the
+           fallback was visibly under way). */
+        buildUpgrade();
       })();
     </script>
 
