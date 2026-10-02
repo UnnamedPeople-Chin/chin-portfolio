@@ -5887,6 +5887,10 @@
                 },
               );
             });
+            /* The stamp lands as the portrait is essentially gone (its fade-out
+               ends at ~1.72s with the 220ms stagger). It starts a beat before
+               that, when the book is already ~90% faded, so the name never reads
+               as sitting on the book and there is no dead flash between them. */
             stampEls.forEach(function (el, i) {
               el.animate(
                 [
@@ -5895,7 +5899,7 @@
                 ],
                 {
                   duration: 300,
-                  delay: 420 + i * 70,
+                  delay: 1680 + i * 60,
                   easing: "ease-out",
                   fill: "forwards",
                 },
@@ -5904,7 +5908,7 @@
             backstop = setTimeout(function () {
               if (ctl.closed) return;
               resolveIntro();
-            }, 1900);
+            }, 2300);
             return;
           }
 
@@ -5997,6 +6001,11 @@
                 }),
               );
             });
+            /* The portrait (last plate) holds opacity 1 through offset 0.74,
+               then fades to 0 by the end of its 2050ms run — plus its 280ms
+               stagger, that is ~2.33s. The stamp starts exactly there, so it
+               lands on empty ground — never on the book, and with no dead flash
+               because the two meet at zero. */
             stampEls.forEach(function (el, i) {
               el.animate(
                 [
@@ -6005,7 +6014,7 @@
                 ],
                 {
                   duration: 340,
-                  delay: 1550 + i * 80,
+                  delay: 2330 + i * 80,
                   easing: "ease-out",
                   fill: "forwards",
                 },
@@ -6864,32 +6873,35 @@
           );
         });
 
-        /* 5. hot-stamp the name and the role over the held portrait */
-        tl.fromTo(
-          ".intro-name",
-          { opacity: 0, scale: 1.06 },
-          { opacity: 1, scale: 1, duration: 0.38, ease: "back.out(1.8)" },
-          1.94,
-        );
-        tl.fromTo(
-          ".intro-kicker, .intro-role, .intro-index",
-          { opacity: 0, y: 8 },
-          { opacity: 1, y: 0, duration: 0.32, ease: "power2.out", stagger: 0.05 },
-          2.04,
-        );
-
-        /* 6. the portrait dissolves too: once the name has landed on it, the
-           sketchbook fades away and leaves the name alone on the ground. The
-           entrance therefore ends on the visitor's identity and the Continue
-           button, not on a held photograph. */
+        /* 5. the portrait dissolves FIRST: the sketchbook fades off the ground,
+           leaving the cover empty. The name is stamped only once it has gone
+           (step 6), so the identity never lands on top of the book — the two
+           read as a sequence, not a collision. */
         const portrait = plates[plates.length - 1];
         if (portrait) {
           tl.to(
             portrait,
-            { opacity: 0, scale: 1.04, duration: 0.5, ease: "power1.inOut" },
-            2.5,
+            { opacity: 0, scale: 1.04, duration: 0.46, ease: "power1.inOut" },
+            1.95,
           );
         }
+
+        /* 6. hot-stamp the name and the role onto the now-empty ground. The name
+           begins exactly as the book reaches zero (the fade-out ends at 2.41s),
+           so the identity lands on empty ground — no overlap, and no dead flash
+           because the two meet at zero. */
+        tl.fromTo(
+          ".intro-name",
+          { opacity: 0, scale: 1.06 },
+          { opacity: 1, scale: 1, duration: 0.42, ease: "back.out(1.8)" },
+          2.41,
+        );
+        tl.fromTo(
+          ".intro-kicker, .intro-role, .intro-index",
+          { opacity: 0, y: 8 },
+          { opacity: 1, y: 0, duration: 0.34, ease: "power2.out", stagger: 0.05 },
+          2.55,
+        );
 
         /* Backstop: if the timeline never completes (tab backgrounded, an error
            mid-run), the cover still resolves so the Continue button appears
