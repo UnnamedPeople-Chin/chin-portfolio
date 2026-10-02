@@ -8,10 +8,13 @@
       name="description"
       content="Full-Stack Developer, AI Engineer &amp; Frontend Developer · Politeknik Negeri Semarang"
     />
-    <!-- bg-wash.jpg is only ever a decorative ground texture (inverted to
+    <!-- bg-wash.webp is only ever a decorative ground texture (inverted to
          grayscale at ~0.5 opacity in `.wash` and `.intro-stage:before`), so it
          is deliberately NOT preloaded — it would only race the LCP image
-         (portrait-intro) for one of the origin's few HTTP/1.1 connections. -->
+         (portrait-intro) for one of the origin's few HTTP/1.1 connections.
+         Re-encoded JPEG -> WebP q78 (147.8 -> 91.0 KB, -38%) at the same
+         2400x1018; the final composited delta is ~2.5/255 under the page's
+         invert+grayscale+brightness filter, i.e. invisible. -->
     <link rel="preload" as="image" href="/chin-portfolio/portrait-intro.webp" />
     <!-- The display face (Instrument Serif) renders the hot-stamped name and
          the hero title — both are above-the-fold and load-blocking for the
@@ -269,7 +272,7 @@
          carries the engraving texture on top. */
       .wash{
         position:fixed;inset:0;z-index:-2;pointer-events:none;
-        background:url(/chin-portfolio/bg-wash.jpg) center top / cover no-repeat;
+        background:url(/chin-portfolio/bg-wash.webp) center top / cover no-repeat;
         opacity:.45;
         filter:invert(1) grayscale(1) brightness(.62);
       }
@@ -1628,7 +1631,7 @@
         content: "";
         position: absolute;
         inset: 0;
-        background: url(/chin-portfolio/bg-wash.jpg) center top / cover no-repeat;
+        background: url(/chin-portfolio/bg-wash.webp) center top / cover no-repeat;
         filter: invert(1) grayscale(1) brightness(.42);
         opacity: .55;
         pointer-events: none;
