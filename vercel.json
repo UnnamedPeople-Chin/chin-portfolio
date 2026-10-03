@@ -2,9 +2,20 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [
     {
-      "source": "/",
-      "destination": "/landing-pages/chin-portfolio.html",
+      "source": "/index.html",
+      "destination": "/",
       "permanent": true
+    },
+    {
+      "source": "/landing-pages/chin-portfolio.html",
+      "destination": "/",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/landing-pages/chin-portfolio.html"
     }
   ],
   "headers": [

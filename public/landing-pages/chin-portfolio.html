@@ -64,28 +64,22 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
 
     <!-- ---- Social sharing ----
-         TODO(domain): og:image, og:url and og:image:secure_url need an absolute
-         URL and are therefore NOT set yet. A root-relative og:image is invalid:
-         the Open Graph spec types og:image as a URL carrying an http/https
-         scheme, and Meta states it outright ("The og:image mark-up is an
-         absolute URL"). Guessing one would ship a broken preview to every
-         platform, so these stay off until the site has a real domain. When it
-         does, add exactly:
-
-           <meta property="og:url" content="https://YOUR-DOMAIN/" />
-           <meta property="og:image" content="https://YOUR-DOMAIN/chin-portfolio/og-image.jpg" />
-           <meta property="og:image:secure_url" content="https://YOUR-DOMAIN/chin-portfolio/og-image.jpg" />
-           <meta property="og:image:type" content="image/jpeg" />
-           <meta property="og:image:width" content="1200" />
-           <meta property="og:image:height" content="630" />
-           <meta property="og:image:alt" content="Jizdan YR, Full-Stack Developer and AI Engineer" />
-           <link rel="canonical" href="https://YOUR-DOMAIN/" />
-
-         and also uncomment the matching twitter:image line below. og-image.jpg
-         is already built and waiting at public/chin-portfolio/og-image.jpg
-         (1200x630, 106 KB, JPEG). It is JPEG rather than the site's WebP on
-         purpose: Meta's og:image:type documentation enumerates only image/jpeg,
-         image/gif and image/png, and LinkedIn is reported to skip WebP. -->
+         The site now has a real domain (www.jizdanyr.my.id), so the absolute
+         URLs below are set. They MUST be absolute: the Open Graph spec types
+         og:image / og:url / og:image:secure_url as URLs carrying an http(s)
+         scheme, and Meta states a root-relative og:image is invalid. The apex
+         host 308-redirects to www, so www is the canonical form. og-image.jpg
+         is 1200x630 JPEG on purpose: Meta's og:image:type enumerates only
+         image/jpeg, image/gif and image/png, and LinkedIn is reported to skip
+         WebP. -->
+    <meta property="og:url" content="https://www.jizdanyr.my.id/" />
+    <meta property="og:image" content="https://www.jizdanyr.my.id/chin-portfolio/og-image.jpg" />
+    <meta property="og:image:secure_url" content="https://www.jizdanyr.my.id/chin-portfolio/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Jizdan YR, Full-Stack Developer and AI Engineer" />
+    <link rel="canonical" href="https://www.jizdanyr.my.id/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Jizdan YR" />
     <meta property="og:title" content="Jizdan YR, Full-Stack Developer &amp; AI Engineer" />
@@ -101,7 +95,7 @@
          one line is the whole X/Twitter requirement. summary_large_image (not
          summary) because summary renders a 144x144 square and would discard the
          wide card. -->
-    <!-- <meta name="twitter:image" content="https://YOUR-DOMAIN/chin-portfolio/og-image.jpg" /> -->
+    <meta name="twitter:image" content="https://www.jizdanyr.my.id/chin-portfolio/og-image.jpg" />
 
     <!-- ---- Structured data ----
          ProfilePage rather than a bare Person: mainEntity is the one property
@@ -109,16 +103,18 @@
          subject. affiliation, NOT alumniOf — "student" is not an alumnus, and
          alumniOf would claim a graduation that has not happened. inLanguage
          sits on the ProfilePage because it is not a valid property of Person.
-         url and image are omitted: both are valid on Person but need an
-         absolute URL. -->
+         url and image are absolute now that the domain exists. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "ProfilePage",
         "inLanguage": "en",
+        "url": "https://www.jizdanyr.my.id/",
         "mainEntity": {
           "@type": "Person",
           "name": "Jizdan YR",
+          "url": "https://www.jizdanyr.my.id/",
+          "image": "https://www.jizdanyr.my.id/chin-portfolio/og-image.jpg",
           "jobTitle": ["Full-Stack Developer", "AI Engineer", "Frontend Developer"],
           "affiliation": {
             "@type": "EducationalOrganization",
