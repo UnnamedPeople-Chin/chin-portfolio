@@ -5846,12 +5846,10 @@
           let closed = false;
           let introStarted = false;
           let backstop = 0;
-          /* Shared with the post-CDN runner at the bottom of the page — the
-             only place `gsap` is guaranteed to be defined. `tl` / `backstopId`
-             are the animation handles `dismiss()` must be able to kill;
-             `closed` is set the moment a dismissal begins, so the upgrade
-             runner can tell "user already skipped" (leave it alone) apart from
-             "the dependency-free fallback merely started" (safe to replace). */
+          /* The entrance's shared state. `tl` / `backstopId` are the animation
+             handles `dismiss()` must be able to kill; `closed` is set the
+             moment a dismissal begins, so a late timer can tell "user already
+             skipped" (do nothing) apart from "the sequence is still running". */
           const ctl = {
             tl: null,
             backstopId: 0,
@@ -5969,8 +5967,7 @@
              the Continue button so it cannot fire before there is something to
              continue from; `enterPage()` is the one path out — it fires the
              riffle (so the sketchbook still turns to the archive) and lifts the
-             cover. Both the GSAP timeline and the WAAPI fallback call
-             `resolveIntro()` when they settle. */
+             cover. The sequence calls `resolveIntro()` when it settles. */
           let continueReady = false;
           function resolveIntro() {
             continueReady = true;
@@ -5985,8 +5982,7 @@
           /* "Show the real page immediately": no cover, no riffle, and the
              flip-book put straight into its landed state. `introStarted` is
              latched so any later startRiffle() is a no-op, and the stage is
-             removed synchronously, so the post-CDN upgrade runner bails on its
-             own `!stage.parentNode` guard. Used by reduced motion and by the
+             removed synchronously. Used by reduced motion and by the
              back/forward return that skips the replay. */
           function showContentNow() {
             introStarted = true;
@@ -6193,11 +6189,9 @@
             };
           }
 
-          /* Dependency-free fallback. It runs IMMEDIATELY, because this block is
-             pre-CDN and `gsap` is not defined yet — but it is REPLACED by the
-             GSAP timeline the moment the post-CDN runner at the bottom of the
-             page takes over (see window.__introCtl). Both drive the identical
-             five-plate sequence: fly in from the wings, fan, FLIP-settle onto
+          /* The entrance sequence, dependency-free: it runs immediately from
+             this pre-CDN block, so a hung CDN can never strand the cover. It
+             drives the five plates — fly in from the wings, fan, settle onto
              the real book, cross-fade, hot-stamp the name. */
           let fallbackAnims = [];
           /* Keyframes are rebuilt, not captured once: `flipFor(i)` is evaluated
@@ -6277,10 +6271,8 @@
             }, 2700);
           }
 
-          /* Re-seed the fallback's keyframes on resize so a viewport change while
-             the cover is up still lands the plates on the book. Cancelled
-             animations (the GSAP runner took over) report playState "idle" and
-             are skipped, so this can never resurrect a dead sequence. */
+          /* Re-seed the keyframes on resize so a viewport change while the
+             cover is up still lands the plates on the book. */
           function onFallbackResize() {
             if (!fallbackAnims.length || ctl.closed) return;
             fallbackAnims.forEach(function (a, i) {
@@ -6290,14 +6282,11 @@
           }
           window.addEventListener("resize", onFallbackResize);
 
-          /* The five-plate sequence is the whole entrance: run it now. The
-             post-CDN runner replaces this WAAPI fallback with the richer GSAP
-             timeline a moment later, the moment `gsap` is defined. */
+          /* The five-plate sequence is the whole entrance: run it now. */
           runFallback();
 
-          /* Handed to the post-CDN runner: it either replaces the fallback with
-             the GSAP timeline, or (gsap blocked) leaves the fallback standing.
-             `dismiss` is shared, so a user skip always wins the race. */
+          /* Exposed for teardown + tests. `dismiss` is shared, so a user skip
+             always wins the race against any timer. */
           window.__introCtl = {
             stage: stage,
             plates: plates,
@@ -6959,231 +6948,6 @@
         }, { passive: true });
       })();
 
-      /* ---- Entrance: upgrade the pre-CDN fallback to the GSAP timeline ----
-         This block runs AFTER the two CDN <script src> tags, so it is the only
-         place `gsap` is guaranteed to exist by now. The pre-CDN block has
-         already armed the fallback animation, the scroll lock, the focus trap
-         and the skip handlers — so if this block never runs (CDN hung, SRI
-         mismatch, parser parked), the cover still dismisses on its own and the
-         page is never stranded. Here we only swap the fallback for the richer
-         GSAP version, and only while it is still on screen. */
-      (function initIntroUpgrade() {
-        const ctl = window.__introCtl;
-        if (!ctl) return; // markup absent, or already removed via ?nointro
-        if (typeof gsap === "undefined" || !gsap.timeline) return; // fallback stands
-        /* If the user already skipped, or the stage is already gone, leave the
-           finished/underway fallback alone. `started` is NOT checked: the
-           fallback sets it immediately by design, and replacing it is the
-           whole point of this runner. */
-        if (ctl.ctl.closed || !ctl.stage.parentNode) return;
-
-        const plates = ctl.plates;
-        const stampEls = ctl.stampEls;
-        const flipFor = ctl.flipFor;
-        const dismiss = ctl.dismiss;
-        const startRiffle = ctl.startRiffle;
-
-        /* "First refusal" to the fallback. A slow CDN is the case this guards:
-           gsap can arrive a second in, by which point the WAAPI fallback has
-           the plates visibly on screen. Cancelling a visible animation and
-           restarting the whole sequence from the wings is the replay flash the
-           audit caught (a 128px centre jump at 0.77 opacity — the plates
-           snapped back off-screen and flew in a second time). If the plates are
-           already showing, the fallback has effectively become the entrance, so
-           it keeps it and finishes on its own; its backstop still lifts the
-           cover and fires the riffle. The swap only happens while the plates
-           are still near-invisible, where replacing them is imperceptible. */
-        const alreadyShowing = plates.some(function (p) {
-          return parseFloat(getComputedStyle(p).opacity) > 0.25;
-        });
-        if (alreadyShowing) return;
-
-        /* The plate sequence is the whole entrance now (the rack is gone), so
-           this runner replaces the WAAPI fallback the moment GSAP arrives.
-           `gsap.set(plates, {opacity:0})` below wipes the fallback's fill, so
-           the fallback's animations and its stall-guard timer are cancelled
-           first (immediately below) and the GSAP timeline takes the sequence
-           over from the top. */
-        function buildUpgrade() {
-        /* Cancel the fallback: stop its WAAPI animations and its backstop, so
-           the two animations cannot fight over the same transform. */
-        clearTimeout(ctl.ctl.backstopId);
-        plates.forEach(function (p) {
-          if (p.getAnimations) p.getAnimations().forEach(function (a) { a.cancel(); });
-        });
-        stampEls.forEach(function (el) {
-          if (el.getAnimations) el.getAnimations().forEach(function (a) { a.cancel(); });
-        });
-        ctl.ctl.started = true; // the GSAP timeline now owns the sequence
-
-        gsap.set(plates, { opacity: 0, clearProps: "transform" });
-        gsap.set(stampEls, { opacity: 0 });
-
-        const tl = gsap.timeline({
-          /* The entrance resolves onto the portrait plate and HOLDS: the cover
-             is no longer lifted on the timeline's completion. The Continue
-             button (wired to enterPage) is what fires the riffle and lifts it,
-             so the reveal is read at the visitor's own pace. */
-          onComplete: function () {
-            ctl.resolveIntro();
-          },
-        });
-        ctl.ctl.tl = tl; // dismiss() can now kill this exact timeline
-
-        /* 1. plates fly in from the wings */
-        plates.forEach(function (p, i) {
-          const dir = i % 2 === 0 ? -1 : 1;
-          tl.fromTo(
-            p,
-            {
-              x: dir * (window.innerWidth * 0.62),
-              rotation: dir * -14,
-              scale: 0.8,
-              opacity: 0,
-            },
-            {
-              x: 0,
-              rotation: dir * -4,
-              scale: 1,
-              opacity: 1,
-              duration: 0.4,
-              ease: "back.out(1.6)",
-            },
-            0.05 + i * 0.08,
-          );
-        });
-
-        /* 2. fan out like a deck of archival prints. The horizontal spread is
-           the point: without it every plate converges on the centre and the
-           deck reads as one muddy stack. */
-        const spread = Math.min(150, window.innerWidth * 0.11);
-        plates.forEach(function (p, i) {
-          const off = i - 2; // -2 .. 2
-          tl.to(
-            p,
-            {
-              x: off * spread,
-              rotation: off * 5,
-              y: Math.abs(off) * 18,
-              duration: 0.48,
-              ease: "power2.out",
-            },
-            0.6,
-          );
-        });
-
-        /* 3. FLIP: fan -> settle onto the real book, staggered so it reads as
-           the prints riffle down one by one rather than collapsing.
-           The target is a FUNCTION, not a number: GSAP evaluates it when the
-           tween first renders, so a viewport resize between timeline-build and
-           the settle resolves against the LIVE layout instead of the stale
-           geometry captured at build time. `flipTweens` keeps the handles so a
-           resize that lands *during* the settle can re-seed them (below). */
-        const flipTweens = [];
-        plates.forEach(function (p, i) {
-          if (!flipFor(i)) return;
-          const t = tl.to(
-            p,
-            {
-              x: function () {
-                const f = flipFor(i);
-                return f ? f.dx : 0;
-              },
-              y: function () {
-                const f = flipFor(i);
-                return f ? f.dy : 0;
-              },
-              scale: function () {
-                const f = flipFor(i);
-                return f ? f.sc : 1;
-              },
-              rotation: 0,
-              duration: 0.52,
-              ease: "power3.inOut",
-            },
-            1.02 + i * 0.065,
-          );
-          flipTweens.push(t);
-        });
-
-        /* A resize while the cover is still up re-seeds the FLIP targets against
-           the new layout, so the plates still land exactly on the book. Guarded
-           on the stage still being in the DOM: after dismissal there is nothing
-           left to correct. Registered on `ctl` so release() can unhook it. */
-        function onIntroResize() {
-          if (!ctl.ctl.closed && ctl.stage.parentNode) {
-            flipTweens.forEach(function (t) {
-              t.invalidate();
-            });
-          }
-        }
-        ctl.ctl.onResize = onIntroResize;
-        window.addEventListener("resize", onIntroResize);
-
-        /* 4. the four project spreads clear out (staggered, so it reads as a
-           riffle ending rather than a stack blinking off), leaving the
-           portrait — LAST in DOM order, so already the top of the pile — as
-           the single held plate. Step 6 then dissolves it as well. */
-        plates.forEach(function (p, i) {
-          if (i === plates.length - 1) return; // the portrait plate stays
-          tl.to(
-            p,
-            {
-              opacity: 0,
-              scale: 0.94,
-              duration: 0.34,
-              ease: "power1.out",
-            },
-            1.72 + i * 0.04,
-          );
-        });
-
-        /* 5. the portrait dissolves FIRST: the sketchbook fades off the ground,
-           leaving the cover empty. The name is stamped only once it has gone
-           (step 6), so the identity never lands on top of the book — the two
-           read as a sequence, not a collision. */
-        const portrait = plates[plates.length - 1];
-        if (portrait) {
-          tl.to(
-            portrait,
-            { opacity: 0, scale: 1.04, duration: 0.46, ease: "power1.inOut" },
-            1.95,
-          );
-        }
-
-        /* 6. hot-stamp the name and the role onto the now-empty ground. The name
-           begins exactly as the book reaches zero (the fade-out ends at 2.41s),
-           so the identity lands on empty ground — no overlap, and no dead flash
-           because the two meet at zero. */
-        tl.fromTo(
-          ".intro-name",
-          { opacity: 0, scale: 1.06 },
-          { opacity: 1, scale: 1, duration: 0.42, ease: "back.out(1.8)" },
-          2.41,
-        );
-        tl.fromTo(
-          ".intro-kicker, .intro-role, .intro-index",
-          { opacity: 0, y: 8 },
-          { opacity: 1, y: 0, duration: 0.34, ease: "power2.out", stagger: 0.05 },
-          2.55,
-        );
-
-        /* Backstop: if the timeline never completes (tab backgrounded, an error
-           mid-run), the cover still resolves so the Continue button appears
-           rather than leaving the visitor stranded. Sized past the last tween
-           (step 6 ends at ~3.0s) so it never fires mid-fade. */
-        ctl.ctl.backstopId = setTimeout(function () {
-          if (ctl.ctl.closed) return;
-          ctl.resolveIntro();
-        }, 3800);
-        } /* end buildUpgrade() */
-
-        /* The rack is gone, so there is nothing to wait for: build the richer
-           timeline now, replacing the WAAPI fallback that started a moment ago
-           (the "first refusal" check above has already bowed out if the
-           fallback was visibly under way). */
-        buildUpgrade();
-      })();
     </script>
 
     <!-- Backsound: a self-contained player (no API, no token, no network
