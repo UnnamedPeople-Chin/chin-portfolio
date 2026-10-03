@@ -6519,10 +6519,14 @@
           }
 
           function dismiss(instant) {
-            if (closed) return;
+            if (dismissed) return;          /* its own latch: release() owns `closed` */
+            dismissed = true;
             ctl.closed = true;
             clearTimeout(backstop);
             clearTimeout(ctl.backstopId);
+            clearTimeout(liftTimer);        /* NEW — an instant dismissal must not */
+            clearTimeout(turnTimer);        /* NEW   be raced by the exit's timers   */
+            clearTimeout(closeTimer);       /* NEW */
             if (ctl.tl) {
               try {
                 ctl.tl.kill();
@@ -6530,7 +6534,9 @@
                 /* already gone */
               }
             }
-            release();
+
+            /* Order matters (J2-1): mark the stage gone and schedule its removal
+               BEFORE release(), and never let a throw in release() strand the cover. */
             stage.classList.add("is-gone");
             /* The button is a sibling of the stage (it must not sit under
                aria-hidden), so it does not inherit the stage's .is-gone fade.
@@ -6551,6 +6557,17 @@
             }
             if (instant) removeNow();
             else setTimeout(removeNow, 340);
+
+            try { release(); } catch (e) { /* the cover still goes */ }
+
+            /* Focus handoff (J3-13): the button is about to leave the DOM and the
+               stage is aria-hidden, so focus would fall to <body>. Land it on the
+               page's own landmark — AFTER release(), which strips `inert`. */
+            try {
+              var land = document.querySelector("main.page") || document.body;
+              if (!land.hasAttribute("tabindex")) land.setAttribute("tabindex", "-1");
+              land.focus({ preventScroll: true });
+            } catch (e) {}
           }
 
           /* Scroll-lock guard: while the cover is up the page must not scroll
@@ -6579,9 +6596,9 @@
                 t.isContentEditable)
             )
               return;
+            if (!continueReady) return;   /* exactly the click handler's gate (J2-10) */
             if (e.cancelable) e.preventDefault();
-            startRiffle();
-            dismiss(false);
+            enterPage();
           }
 
           /* ---- the entrance hand-off -----------------------------------------
@@ -6592,14 +6609,46 @@
              continue from; `enterPage()` is the one path out — it fires the
              riffle (so the sketchbook still turns to the archive) and lifts the
              cover. The sequence calls `resolveIntro()` when it settles. */
-          let continueReady = false;
+          /* ---- the exit: spark, lift, TURN, then the untouched dismiss() --------
+             The riffle starts WITH the turn (+400), not before it: started at 0 it
+             would play its whole 841ms behind an opaque cover — the exact J1-3
+             defect. The stage's own fade begins at +800 and lands on +1240, so the
+             book is turning on screen for ~440ms of its run.
+             Idempotent: ctl.lifting latches on the first call (J3-12), so a click
+             and a synthetic Enter in the same tick cannot run the exit twice. */
+          function revealThenDismiss() {
+            if (REDUCED) { dismiss(false); return; }
+            if (ctl.lifting) return;
+            ctl.lifting = true;
+
+            /* The spark's anchor is measured HERE, not at arm time, so a resize
+               between arm and click cannot leave --burst-cy stale. */
+            if (continueBtn) {
+              var r = continueBtn.getBoundingClientRect();
+              stage.style.setProperty("--burst-cy", r.top + r.height / 2 + "px");
+            }
+
+            stage.classList.add("is-bursting");
+            liftTimer = setTimeout(function () {
+              if (ctl.closed) return;
+              stage.classList.add("is-lifting");
+            }, 120);
+            turnTimer = setTimeout(function () {
+              if (ctl.closed) return;
+              stage.classList.add("is-turn");
+              startRiffle();                 /* +400: the book begins to turn */
+            }, 400);
+            closeTimer = setTimeout(function () { dismiss(false); }, 1240);
+          }
+
           function resolveIntro() {
             continueReady = true;
             if (continueBtn) continueBtn.classList.add("is-on");
           }
           function enterPage() {
-            startRiffle();
-            dismiss(false);
+            revealThenDismiss();     /* was: startRiffle(); dismiss(false); — the
+                                        riffle now fires from inside the exit, at
+                                        +400, where it is visible. */
           }
 
           /* ---- instant paths: nothing to animate, drop the stage at once ---- */
