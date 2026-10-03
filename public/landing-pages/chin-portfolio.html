@@ -225,6 +225,11 @@
         --font:'Newsreader',"New York",Georgia,'Times New Roman',serif;
         --track-caps:.24em;
         --track-nav:.06em;
+        /* The deckled edge of the plate sheet, as an alpha mask. GENERATED —
+           never hand-edited. See tools/gen-deckle-mask.mjs, which rewrites
+           this one line and nothing else. 1000x2000, bottom edge ragged by
+           0-12 units, alpha only (no fill colour needed). */
+        --deckle:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1000' height='2000' preserveAspectRatio='none'%3E%3Cpath fill='%23fff' d='M0 0 H1000 V1998 L969.7 1991.8 L939.39 1996.2 L909.09 1989.5 L878.79 1994.6 L848.48 1988 L818.18 1995.8 L787.88 1992.5 L757.58 1989 L727.27 1994 L696.97 1996.8 L666.67 1991 L636.36 1993.2 L606.06 1988.3 L575.76 1992 L545.45 1995.4 L515.15 1990.2 L484.85 1993.6 L454.55 1996.5 L424.24 1991.4 L393.94 1988.7 L363.64 1992.8 L333.33 1995 L303.03 1990.8 L272.73 1994.2 L242.42 1989.2 L212.12 1992.2 L181.82 1996 L151.52 1990 L121.21 1993.4 L90.91 1988.4 L60.61 1992.6 L30.3 1994.8 L0 1990.4 H0 Z'/%3E%3C/svg%3E");
       }
       /* Registered colours drift instead of snapping. The class is added by
          script only where @property exists, because a plain (unregistered)
@@ -1717,7 +1722,16 @@
         content: "";
         position: absolute;
         inset: 0;
-        background: url(/chin-portfolio/bg-wash.webp) center top / cover no-repeat;
+        /* The plate's own glow, baked. v1 put a `filter: drop-shadow()` on the
+           SVG so the ruling would bloom — a full-viewport blur re-rasterised
+           every frame of a 3-second animation. A static radial gradient is the
+           same light for zero per-frame cost. */
+        background:
+          radial-gradient(58% 46% at 50% 50%,
+            rgba(198, 160, 83, .10) 0,
+            rgba(198, 160, 83, .045) 42%,
+            rgba(198, 160, 83, 0) 74%),
+          url(/chin-portfolio/bg-wash.webp) center top / cover no-repeat;
         filter: invert(1) grayscale(1) brightness(.42);
         opacity: .55;
         pointer-events: none;
@@ -1737,13 +1751,17 @@
         position: absolute;
         left: 50%;
         top: 50%;
-        width: clamp(200px, 34vw, 440px);
+        /* The plate box is now the containing block (the deck is inset:0 inside
+           .intro-plate-draw), so the fan is measured in the frame's own units
+           instead of in vw. 47% of the 940px box ≈ the 440px v1 cap. */
+        width: var(--pw);
         aspect-ratio: 16 / 9;
-        margin-left: calc(-1 * clamp(100px, 17vw, 220px));
-        margin-top: calc(-1 * clamp(56.25px, 9.5625vw, 123.75px));
+        margin-left: calc(-1 * var(--pw) / 2);
+        margin-top: calc(-1 * var(--pw) * 9 / 32);
         opacity: 0;
         will-change: transform, opacity;
       }
+      .intro-stage { --pw: clamp(200px, 47%, 480px); --spread: min(120px, 9vw); }
       .intro-plate img {
         width: 100%;
         height: 100%;
@@ -1751,6 +1769,260 @@
         object-fit: contain;
         filter: drop-shadow(0 10px 26px rgba(2, 5, 14, 0.55));
       }
+
+      /* =====================================================================
+         THE RULED PLATE — the drawn entrance.
+         Every line is a stroke-dashoffset draw under pathLength="1"; every
+         element carries a dry class, never an attribute-substring selector
+         (a formatter writing `--dry: 8` would silently kill that dispatch).
+         The whole ladder is gated by ONE class, `.is-live`, so nothing here
+         depends on the CDN.
+         ===================================================================== */
+
+      /* ---- the stage's own size token, and the plate box -------------------
+         The box is 16:9 so `preserveAspectRatio="xMidYMid meet"` is a no-op:
+         one viewBox unit is one CSS px times a single uniform scale. */
+      .intro-stage {
+        --plate-w: min(84vw, 940px, 128vh);
+        perspective: 1400px;      /* for the exit's rotateX; see the exit block */
+      }
+
+      /* ---- the site's own drafting surface, on the cover -------------------
+         Byte-for-byte the same grid the page already draws behind everything
+         (.grid-paper): the same 64px cell, the same 5% cream, the same radial
+         feather, the same 44px cell on phones. v1 hid this surface under the
+         drawing; the drawing is now ruled ON it. */
+      .intro-grid {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        --grid-cell: 64px;
+        background-image:
+          repeating-linear-gradient(90deg, rgba(239, 231, 214, .05) 0 1px, transparent 1px var(--grid-cell)),
+          repeating-linear-gradient(0deg,  rgba(239, 231, 214, .05) 0 1px, transparent 1px var(--grid-cell));
+        -webkit-mask-image: radial-gradient(125% 95% at 50% 38%, #000 52%, transparent 100%);
+                mask-image: radial-gradient(125% 95% at 50% 38%, #000 52%, transparent 100%);
+        mix-blend-mode: screen;
+      }
+      @media (max-width: 640px) { .intro-grid { --grid-cell: 44px } }
+
+      /* ---- the plate box ---------------------------------------------------
+         Wraps the deck. The drawing is its first child and the deck its
+         second, so the spreads fly OVER the ruling. Its ::before is the cream
+         plate sheet the ruling is printed on (it only appears at the exit). */
+      .intro-plate-draw {
+        position: relative;
+        width: var(--plate-w);
+        aspect-ratio: 16 / 9;
+        transform-origin: 50% 0%;
+        transform: translate3d(0, 0, 0);
+      }
+      .intro-plate-draw:before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        z-index: -1;              /* under the ruling; the stage isolates */
+        opacity: 0;
+        transition: opacity 220ms ease;
+        /* the gold lip IS this element's bottom 17px, so the deckle mask cuts
+           paper and lip along one line and can never leave the lip behind */
+        background:
+          linear-gradient(to top,
+            rgba(198, 160, 83, .92) 0,
+            rgba(198, 160, 83, .34) 7px,
+            rgba(198, 160, 83, 0) 17px),
+          linear-gradient(rgba(239, 231, 214, .115), rgba(239, 231, 214, .075));
+        -webkit-mask-image: var(--deckle);
+                mask-image: var(--deckle);
+        -webkit-mask-size: 100% 100%;
+                mask-size: 100% 100%;
+        -webkit-mask-repeat: no-repeat;
+                mask-repeat: no-repeat;
+        pointer-events: none;
+      }
+
+      /* ---- the drawing -----------------------------------------------------
+         `screen` is the site's own register: it lets the engraving lift off
+         the navy ground instead of sitting on it as a bright sticker. The
+         stage is `isolation:isolate`, so the blend has a group of its own
+         and never touches the page behind it. */
+      .intro-lines {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        mix-blend-mode: screen;
+        pointer-events: none;
+        overflow: visible;
+      }
+      /* The static state is unscoped — a line is invisible before its draw.
+         Only the ANIMATIONS are gated by `.is-live`, so the ladder genuinely
+         starts the moment the class lands. */
+      .intro-draw {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke: #EFE7D6;
+        stroke-opacity: 1;                       /* the "wet" state */
+        stroke-dasharray: 1;                     /* pathLength="1" on every one */
+        stroke-dashoffset: 1;                    /* invisible until its delay  */
+      }
+      .intro-stage.is-live .intro-draw {
+        animation-name: cp-draw, cp-fade;
+        animation-duration: 600ms, 900ms;
+        animation-delay: var(--d, 0ms), calc(var(--d, 0ms) + var(--fade, 620ms));
+        animation-timing-function: cubic-bezier(.34, .22, .47, .84),
+                                  cubic-bezier(.72, .16, .19, .96);
+        animation-fill-mode: forwards;
+      }
+      /* The arcs and the corner marks draw faster, so they hold wet for the
+         same ~20ms before drying. Two durations, two fade offsets, one rule.
+         Scoped to `.is-live` as well, or the base rule's 600ms would win. */
+      .intro-stage.is-live .d-arc-tl, .intro-stage.is-live .d-arc-tr,
+      .intro-stage.is-live .d-arc-br, .intro-stage.is-live .d-arc-bl,
+      .intro-stage.is-live .d-mark-tl, .intro-stage.is-live .d-mark-tr,
+      .intro-stage.is-live .d-mark-bl, .intro-stage.is-live .d-mark-br {
+        --fade: 460ms;
+        animation-duration: 420ms, 900ms;
+      }
+
+      /* ---- the dry ladder --------------------------------------------------
+         Colour AND opacity, separately: the fade animates `stroke-opacity`
+         only, so the gold rule keeps its own `stroke` and cannot dry cream. */
+      .dry-8    { stroke: #EFE7D6; --dry-o: .08 }
+      .dry-12   { stroke: #EFE7D6; --dry-o: .12 }
+      .dry-20   { stroke: #EFE7D6; --dry-o: .20 }
+      .dry-32   { stroke: #EFE7D6; --dry-o: .32 }
+      .dry-gold { stroke: #C6A053; --dry-o: .55 }
+
+      @keyframes cp-draw { to { stroke-dashoffset: .002 } }
+      @keyframes cp-fade { to { stroke-opacity: var(--dry-o, .2) } }
+
+      /* ---- stroke widths (viewBox units; scale .734 at the 940px box) ------
+         The frame lands at 0.92 CSS px and the loupe at 0.55 px: hairlines,
+         which is this site's own stroke language (.rule and .grid-paper are
+         both 1px). The one heavy mark is the strike. */
+      .d-frame    { stroke-width: 1.25 }
+      .d-frame-in { stroke-width: .6 }
+      .d-fold     { stroke-width: .9 }
+      .d-gut-a, .d-gut-b { stroke-width: .4 }
+      .d-loupe    { stroke-width: .75 }
+      .d-arc-tl, .d-arc-tr, .d-arc-br, .d-arc-bl { stroke-width: .5 }
+      .d-mark-tl, .d-mark-tr, .d-mark-bl, .d-mark-br { stroke-width: .9 }
+      .d-base     { stroke-width: 1 }
+      .d-drop     { stroke-width: .6 }
+      .d-centre-a, .d-centre-b { stroke-width: .9 }
+      .d-namerule { stroke-width: 1 }
+
+      /* ---- the scaffolding, and the one thing that dissolves ---------------
+         The fold and the gutter are the BOOK's axis. The book is gone once the
+         spreads have flown, so they go with it — and only they. Everything
+         else in the drawing survives the dissolve. */
+      .intro-scaffold { opacity: 1 }
+      .intro-stage.is-live .intro-scaffold {
+        animation: cp-dissolve 500ms cubic-bezier(.72, .16, .19, .96) 2750ms forwards;
+      }
+      @keyframes cp-dissolve { to { opacity: 0 } }
+
+      /* ---- the strike: the one mark that never dries ----------------------
+         r=8 is 11.7 CSS px across at the 940px box, at full ink, and it
+         holds. This replaces v1's 2.4-unit dot at 32%. */
+      .d-strike {
+        fill: #EFE7D6;
+        stroke: none;
+        opacity: 0;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .d-strike-glow {
+        fill: none;
+        stroke: var(--earth);
+        stroke-width: 1.5;
+        opacity: 0;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .intro-stage.is-live .d-strike {
+        animation: cp-strike 480ms cubic-bezier(.2, .9, .3, 1) 2620ms forwards;
+      }
+      .intro-stage.is-live .d-strike-glow {
+        animation: cp-strike-glow 620ms ease-out 2620ms forwards;
+      }
+      @keyframes cp-strike {
+        0%   { transform: scale(0);   opacity: 0 }
+        42%  { transform: scale(1.6); opacity: 1 }   /* the flash */
+        75%  { transform: scale(1);   opacity: 1 }
+        100% { transform: scale(1);   opacity: 1 }   /* holds, forever */
+      }
+      @keyframes cp-strike-glow {
+        0%   { transform: scale(.4);  opacity: 0 }
+        35%  { transform: scale(1.1); opacity: .55 }
+        100% { transform: scale(1.6); opacity: 0 }
+      }
+
+      /* ---- the idle drift, on CSS alone ------------------------------------
+         No WAAPI, no FLIP, no per-resize keyframe rebuild: a CSS keyframe
+         list re-resolves itself on resize for free. `--i`, `--dir` and `--y`
+         come from the markup; the fan offset is derived, so the geometry is
+         auditable and there is no JS-side number left. */
+      .intro-stage.is-live .intro-deck {
+        animation: cp-drift-b 7.4s ease-in-out 3600ms infinite alternate;
+      }
+      .intro-stage.is-live .intro-lines {
+        animation: cp-drift-a 6.5s ease-in-out 3600ms infinite alternate;
+      }
+      @keyframes cp-drift-a {
+        from { transform: translate3d(-.9px, .5px, 0) }
+        to   { transform: translate3d(.9px, -.5px, 0) }
+      }
+      @keyframes cp-drift-b {
+        from { transform: rotate(-.35deg) }
+        to   { transform: rotate(.35deg) }
+      }
+
+      .intro-stage.is-live .intro-plate {
+        animation: cp-plate 1400ms cubic-bezier(.22, .61, .36, 1) 900ms forwards;
+      }
+      .intro-stage.is-live .intro-plate--clear {
+        animation:
+          cp-plate 1400ms cubic-bezier(.22, .61, .36, 1) 900ms forwards,
+          cp-plate-clear 400ms ease-in 2300ms forwards;
+      }
+      @keyframes cp-plate {
+        0%   { opacity: 0;
+               transform: translate3d(calc(var(--dir, -1) * -62vw), var(--y, 0px), 0)
+                          rotate(calc(var(--dir, -1) * -14deg)) scale(.8) }
+        34%  { opacity: 1;
+               transform: translate3d(calc((var(--i, 0) - 2) * var(--spread)), var(--y, 0px), 0)
+                          rotate(calc((var(--i, 0) - 2) * 5deg)) scale(1) }
+        100% { opacity: 1;
+               transform: translate3d(calc((var(--i, 0) - 2) * var(--spread)), var(--y, 0px), 0)
+                          rotate(calc((var(--i, 0) - 2) * 5deg)) scale(1) }
+      }
+      /* Only the four PROJECT plates (--clear) fade. The portrait stays, and
+         the strike is revealed behind it as they go. */
+      @keyframes cp-plate-clear { to { opacity: 0 } }
+
+      /* ---- the identity, seated on the drawing -----------------------------
+         The stamp's seat is declared after the identity block below, so it
+         lands later in source than the v1 rules it overrides. Its BOTTOM sits
+         6px under the drawn baseline (viewBox y=590, which is --plate-w *
+         .1797 below the stage's centre line), so the name grows upward from
+         the rule and can never collide with the fan or with the Continue
+         button. v1 stage-centred it and the fan fanned over it. */
+      .intro-stage.is-live .intro-stamp > * {
+        animation: cp-stamp 700ms cubic-bezier(.34, 1.56, .64, 1) forwards;
+      }
+      .intro-stage.is-live .intro-kicker { animation-delay: 2400ms }
+      .intro-stage.is-live .intro-name   { animation-delay: 2490ms }
+      .intro-stage.is-live .intro-role   { animation-delay: 2580ms }
+      .intro-stage.is-live .intro-index  { animation-delay: 2670ms }
+      @keyframes cp-stamp {
+        from { opacity: 0; transform: translateY(14px) }
+        to   { opacity: 1; transform: none }
+      }
+
       .intro-stamp {
         position: absolute;
         left: 0;
@@ -1799,6 +2071,26 @@
         letter-spacing: 0.3em;
         color: var(--ink-faint-text);
         margin-top: 1.1em;
+      }
+
+      /* The name must also fit a short, wide viewport. 9vw of a 1440px screen
+         is 129px, which overflows a 700px-tall window once the stamp is seated
+         below the plate mark; the height term caps it. */
+      .intro-name {
+        font-size: clamp(44px, min(9vw, 13vh), 116px);
+      }
+
+      /* ---- the stamp's seat -------------------------------------------------
+         Declared HERE, after the identity block above, on purpose: these two
+         override the v1 rules at equal specificity, so they must be later in
+         source. The stamp's BOTTOM sits 6px under the drawn baseline (viewBox
+         y=590, which is --plate-w * .1797 below the stage's centre line), so
+         the name grows upward from the rule and can never collide with the fan
+         or with the Continue button. v1 stage-centred it and the fan fanned
+         over it. */
+      .intro-stamp {
+        top: calc(50% + var(--plate-w) * .1797 + 6px);
+        transform: translateY(-100%);
       }
 
       /* ---- "Continue to the archive" button --------------------------------
@@ -1870,6 +2162,232 @@
         opacity: 0;
         visibility: hidden;
       }
+
+      /* =====================================================================
+         THE EXIT — a spark, then the plate lifts and TURNS.
+         The tear is gone. The site's own verb is "turn": it owns an 18-strip
+         curl engine (buildCurl 4381) whose comments say the cover "lifts" and
+         the book "turns", and the material being moved here is a sheet of
+         cream paper, not the engraving plate. Three classes, in order:
+           .is-bursting  +0     the spark ignites on the Continue button
+           .is-lifting   +120   the plate sheet rises 780ms, deckled bottom
+           .is-turn      +400   the sheet rotates away over its top edge,
+                                and the cover itself fades so the riffle
+                                (started the same instant) is visible
+         All three are added by revealThenDismiss() at click time.
+         ===================================================================== */
+
+      /* ---- the spark -------------------------------------------------------
+         24 nodes, hand-placed (no PRNG): 1 core, 8 rays, 6 stars, 9 motes.
+         The motes are the site's own watercolour particle sprites, already
+         shipped and cached; only the rays are vector. Anchored on the
+         Continue button's MEASURED centre, written to --burst-cy by
+         revealThenDismiss() at click time — never a hard-coded constant. */
+      .intro-burst {
+        position: absolute;
+        left: 50%;
+        top: var(--burst-cy, 50%);
+        width: var(--burst);
+        height: var(--burst);
+        transform: translate(-50%, -50%);
+        mix-blend-mode: screen;
+        pointer-events: none;
+        display: none;
+        z-index: 3;
+        --burst: clamp(260px, 34vh, 440px);
+      }
+      .intro-stage.is-bursting .intro-burst {
+        display: block;
+        animation: burst-out 320ms ease 880ms forwards;
+      }
+      @keyframes burst-out { from { opacity: 1 } to { opacity: 0 } }
+
+      .intro-burst .core {
+        fill: var(--earth-text);
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: burst-core 420ms cubic-bezier(.2, .9, .3, 1) forwards;
+      }
+      @keyframes burst-core {
+        0%   { transform: scale(0);   opacity: 0 }
+        30%  { transform: scale(1.5); opacity: 1 }
+        100% { transform: scale(1);   opacity: 1 }
+      }
+
+      /* The rays are the one element that must be DASHED to be seen at all:
+         a `line` has no dash of its own, so v1's rays simply appeared. */
+      .intro-burst .ray {
+        stroke: var(--earth-text);
+        stroke-width: 1.2;
+        stroke-linecap: round;
+        stroke-dasharray: var(--len);
+        stroke-dashoffset: var(--len);
+        animation: burst-ray 520ms cubic-bezier(.2, .7, .3, 1) var(--dd, 0ms) forwards;
+      }
+      @keyframes burst-ray { to { stroke-dashoffset: 0 } }
+
+      .intro-burst .spark {
+        transform-box: fill-box;
+        transform-origin: center;
+        opacity: 0;
+      }
+      .intro-burst .spark--star {
+        fill: var(--earth-text);
+        animation: burst-star 620ms cubic-bezier(.2, .7, .3, 1) var(--dd, 0ms) forwards;
+      }
+      @keyframes burst-star {
+        0%   { transform: translate(0, 0) scale(.2) rotate(0deg); opacity: 0 }
+        40%  { opacity: 1 }
+        100% { transform: translate(var(--sx), var(--sy)) scale(var(--k, 1)) rotate(var(--spin, 0deg)); opacity: 0 }
+      }
+      .intro-burst .spark--mote {
+        animation: burst-mote 700ms ease-out var(--dd, 0ms) forwards;
+      }
+      @keyframes burst-mote {
+        0%   { transform: translate(0, 0) scale(.4); opacity: 0 }
+        35%  { opacity: .9 }
+        100% { transform: translate(var(--sx), var(--sy)) scale(1); opacity: 0 }
+      }
+
+      /* ---- the lift and the turn -------------------------------------------
+         One element carries both: the plate box, which holds the sheet and the
+         ruling. `.is-lifting` rises 26% of its own height; `.is-turn` then
+         rotates it away about its top edge while the cover fades over the same
+         840ms, so the riffle that starts at the same instant (+400) is on
+         screen for its whole run instead of playing behind an opaque cover.
+         The fade carries NO delay: the class lands at +400, so the fade runs
+         +400 → +1240 and lands exactly on dismiss(). */
+      .intro-stage.is-lifting .intro-plate-draw {
+        transition: transform 780ms cubic-bezier(.22, .61, .36, 1);
+        transform: translate3d(0, -26%, 0);
+        will-change: transform;
+      }
+      .intro-stage.is-lifting .intro-plate-draw:before { opacity: 1 }
+      .intro-stage.is-lifting .intro-deck,
+      .intro-stage.is-lifting .intro-lines { animation-play-state: paused }
+
+      .intro-stage.is-turn .intro-plate-draw {
+        transition: transform 840ms cubic-bezier(.33, 1, .68, 1);
+        transform: translate3d(0, -26%, 0) rotateX(-88deg);
+      }
+      .intro-stage.is-turn {
+        opacity: 0;
+        transition: opacity 840ms cubic-bezier(.55, .06, .68, .19);
+      }
+
+      /* ---- the fallback ladder ---------------------------------------------
+         The masked-transform bet — does a mask survive on a layer that is both
+         translated and rotated? — was PROTOTYPED before it shipped
+         (tools/deckle-prototype.html, 14/14 on Chromium: the mask holds
+         through the lift and the rotateX, no unmasked frame). If it ever
+         fails on a target engine, swap `.intro-plate-draw:before`'s mask for,
+         in order:
+           1. `clip-path: polygon(...)` with the same ragged bottom edge;
+           2. no mask at all, and the sheet shrinks to 92% as it lifts.
+         Only the mask declaration changes; nothing else in this file moves.
+         The switch is written here so the fallback is a decision, not a
+         discovery at build time. */
+
+      /* =====================================================================
+         MOBILE (≤640px) — the authoritative ladder, the only copy of it.
+         Delays are scaled .62 and the draw runs 420ms; the last element
+         (.intro-index, delay 2220) ends at 2700, and the resolve deadline is
+         3600 — a 900ms margin. Placed AFTER the exit block on purpose: the
+         burst's --burst / ray overrides below must out-cascade the desktop
+         exit rules (equal specificity — later source wins).
+         ===================================================================== */
+      @media (max-width:640px){
+        /* --- the plate box --- */
+        .intro-plate-draw{ width:min(92vw, 138.6vh) }
+
+        /* --- the draw: delays scaled .62, duration 420ms ---
+           220*.62=136 … the strike's 2620*.62=1624; its glow ends
+           1624+620=2244. The namerule fade ends 1970+700=2670. The scaffold
+           dissolve scales with it: 2750*.62=1705, 500ms. */
+        .intro-stage.is-live .intro-draw{
+          animation-duration:420ms, 700ms;
+          animation-delay:calc(var(--d,0ms) * .62), calc(var(--d,0ms) * .62 + 420ms);
+        }
+        .intro-stage.is-live .intro-scaffold{ animation-delay:1705ms }
+        .intro-stage.is-live .d-strike{
+          animation:cp-strike 480ms cubic-bezier(.2,.9,.3,1) 1624ms forwards;
+        }
+        .intro-stage.is-live .d-strike-glow{
+          animation:cp-strike-glow 620ms ease-out 1624ms forwards;
+        }
+
+        /* --- the plates: 560 + i*70, 1000ms; last (portrait) ends 1840 --- */
+        .intro-stage.is-live .intro-plate{
+          animation:cp-plate 1000ms cubic-bezier(.22,.61,.36,1)
+                    calc(560ms + var(--i,0) * 70ms) forwards;
+        }
+        .intro-stage.is-live .intro-plate--clear{
+          animation:
+            cp-plate 1000ms cubic-bezier(.22,.61,.36,1)
+              calc(560ms + var(--i,0) * 70ms) forwards,
+            cp-plate-clear 400ms ease-in 1840ms forwards;
+        }
+
+        /* --- the identity: 2010 + i*70, 480ms; last ends 2700 (2220+480) --- */
+        .intro-stage.is-live .intro-stamp > *{ animation-duration:480ms }
+        .intro-stage.is-live .intro-kicker{ animation-delay:2010ms }
+        .intro-stage.is-live .intro-name  { animation-delay:2080ms }
+        .intro-stage.is-live .intro-role  { animation-delay:2150ms }
+        .intro-stage.is-live .intro-index { animation-delay:2220ms }
+
+        /* --- drift off on phones: two infinite animations on a throttled
+               device buy nothing --- */
+        .intro-stage.is-live .intro-deck,
+        .intro-stage.is-live .intro-lines{ animation:none }
+
+        /* --- spark: smaller, so the 440px box does not swamp a 360px screen --- */
+        .intro-burst{ --burst:clamp(220px, 62vw, 320px) }
+        .intro-burst .ray{ stroke-width:1 }
+      }
+
+      /* ---- the end state, declared -----------------------------------------
+         This is INSURANCE, not the primary guarantee: on the normal path
+         `REDUCED` removes the stage synchronously before it ever paints (the
+         script's own early exit). This block only covers a stage that is
+         painted anyway — a `js-failed` class set late, or an engine that
+         applies the media query after script has run.
+
+         `stroke-dasharray:none` is load-bearing. `pathLength` is an SVG
+         ATTRIBUTE and cannot be feature-tested with @supports; on an engine
+         without it, the base `stroke-dasharray:1` is a one-USER-UNIT dash,
+         which draws a dotted line. Declaring the end state explicitly is the
+         only correct guarantee. */
+      @media (prefers-reduced-motion: reduce) {
+        .intro-draw {
+          animation: none !important;
+          stroke-dasharray: none;
+          stroke-dashoffset: 0;
+        }
+        .intro-scaffold { opacity: 0 }
+        .d-strike { opacity: 1; animation: none !important }
+        .d-strike-glow { display: none }
+        .intro-plate { animation: none !important; opacity: 0 }
+        .intro-stamp > * { animation: none !important; opacity: 1; transform: none }
+        .intro-plate-draw, .intro-lines, .intro-deck { animation: none !important; transform: none }
+        .intro-burst { display: none !important }
+        .intro-plate-draw:before { display: none }
+        .intro-stage { perspective: none }
+        .intro-stage.is-lifting .intro-plate-draw,
+        .intro-stage.is-turn .intro-plate-draw { transform: none; transition: none }
+        .intro-stage.is-turn { opacity: 1; transition: none }
+      }
+      /* The same end state for the script-failed path. `html:not(.js)` and
+         `html.js-failed` already remove the stage outright; this is the belt
+         for a stage that is still painted. The identity is included: the base
+         rules leave it at opacity:0, so without that last rule a painted
+         js-failed plate would be an empty frame. */
+      html.js-failed .intro-draw {
+        animation: none !important;
+        stroke-dasharray: none;
+        stroke-dashoffset: 0;
+      }
+      html.js-failed .intro-burst { display: none !important }
+      html.js-failed .intro-stamp > * { opacity: 1 }
 
       /* =====================================================================
          Site footer — colophon.
