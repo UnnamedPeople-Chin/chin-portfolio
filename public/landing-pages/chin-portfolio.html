@@ -6661,10 +6661,13 @@
             introStarted = true;
             introOn = false;
             wrap.classList.remove("intro", "b2");
-            idx = LAND;
+            if (!QS.has("shot")) idx = LAND;   /* ?shot=N keeps its N (J2-15) */
             paint();
             removeNow();
           }
+
+          const QS = new URLSearchParams(location.search);   /* moved up: the
+             REDUCED branch below calls showContentNow(), which reads it */
 
           if (REDUCED) {
             showContentNow();
@@ -6673,15 +6676,11 @@
 
           /* ?nointro (skip the riffle) and ?shot (the screenshot harness drives
              the book itself) both want the stage gone with no animation and no
-             riffle — startIntro() honours both, so this is safe. */
-          const QS = new URLSearchParams(location.search);
+             riffle. The inlined copy that used to live here did exactly what
+             showContentNow() does, so it collapses to one call — with the ?shot
+             guard inside showContentNow() preserving the harness's spread (J2-15). */
           if (QS.has("nointro") || QS.has("shot")) {
-            introStarted = true;
-            introOn = false;
-            wrap.classList.remove("intro", "b2");
-            idx = LAND;
-            paint();
-            removeNow();
+            showContentNow();
             return;
           }
 
