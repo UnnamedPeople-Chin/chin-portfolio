@@ -2104,19 +2104,17 @@
       /* ---- the stamp's seat -------------------------------------------------
          Declared HERE, after the identity block above, on purpose: these two
          override the v1 rules at equal specificity, so they must be later in
-         source. The stamp's BOTTOM sits 6px under the drawn baseline, so the
-         name grows upward from the rule and can never collide with the fan or
-         with the Continue button. v1 stage-centred it and the fan fanned over
-         it.
+         source. The stamp's BOTTOM sits 6px under the drawn baseline (viewBox
+         y=590, which is --plate-w * .1797 below the stage's centre line), so
+         the name grows upward from the rule and can never collide with the fan
+         or with the Continue button. v1 stage-centred it and the fan fanned
+         over it.
 
-         The seat is pulled UP from the raw baseline (--plate-w * .1797) to
-         --plate-w * .14: once the portrait is held high in the red-marked
-         upper field, the identity reads best as one centred block under it
-         rather than pinned low on a rule the eye has stopped seeing. .14 is
-         the largest pull that still clears the raised portrait by ~19px at
-         1440x900, so the book can never back the text. */
+         SEAT LOCKED: this is the identity's own position and does not move
+         with the held portrait. The portrait is raised by --raise alone (see
+         .intro-stage), so the ONLY thing that travels up is the sketchbook. */
       .intro-stamp {
-        top: calc(50% + var(--plate-w) * .14 + 6px);
+        top: calc(50% + var(--plate-w) * .1797 + 6px);
         transform: translateY(-100%);
       }
 
