@@ -6470,15 +6470,17 @@
           let closed = false;
           let introStarted = false;
           let backstop = 0;
+          let dismissed = false;      /* dismiss()'s own latch (release() owns `closed`) */
+          let liftTimer = 0;          /* +120  .is-lifting */
+          let turnTimer = 0;          /* +400  .is-turn + startRiffle() */
+          let closeTimer = 0;         /* +1240 dismiss(false) */
           /* The entrance's shared state. `tl` / `backstopId` are the animation
              handles `dismiss()` must be able to kill; `closed` is set the
              moment a dismissal begins, so a late timer can tell "user already
              skipped" (do nothing) apart from "the sequence is still running". */
           const ctl = {
-            tl: null,
-            backstopId: 0,
-            started: false,
-            closed: false,
+            tl: null, backstopId: 0, started: false, closed: false,
+            lifting: false,           /* revealThenDismiss() idempotency latch (J3-12) */
           };
 
           function startRiffle() {
@@ -6503,8 +6505,6 @@
             window.removeEventListener("keydown", onIntroKey, true);
             window.removeEventListener("wheel", swallowScroll, true);
             window.removeEventListener("touchmove", swallowScroll, true);
-            window.removeEventListener("resize", onFallbackResize);
-            if (ctl.onResize) window.removeEventListener("resize", ctl.onResize);
           }
 
           function removeNow() {
@@ -6778,144 +6778,101 @@
             return;
           }
 
-          /* ---- full desktop timeline ---- */
-          /* The FLIP target is computed LIVE, never cached. `offsetLeft/Top/
-             Width/Height` are layout metrics: a CSS transform on the plate (the
-             fallback's WAAPI translate, GSAP's x/y) never changes them, so the
-             resting box stays correct even after the animation has begun —
-             which a getBoundingClientRect() snapshot does not, since it bakes in
-             whatever transform is live at measure time. The book rect is read
-             fresh for the same reason. This is what makes a mid-entrance resize
-             land the plates ON the book: before, the cached target held the
-             pre-resize coordinates and the plates settled at 0.73x the book's
-             width, 300px off centre. */
-          function layoutBox(el) {
-            let x = 0,
-              y = 0,
-              node = el;
-            while (node) {
-              x += node.offsetLeft;
-              y += node.offsetTop;
-              node = node.offsetParent;
-            }
-            return { x: x, y: y, w: el.offsetWidth, h: el.offsetHeight };
-          }
-
-          function flipFor(i) {
-            const bookEl = document.getElementById("sbBook");
-            const b = bookEl ? bookEl.getBoundingClientRect() : null;
-            const lb = layoutBox(plates[i]);
-            if (!b || !b.width || !lb.w) return null;
-            return {
-              dx: b.left + b.width / 2 - (lb.x + lb.w / 2),
-              dy: b.top + b.height / 2 - (lb.y + lb.h / 2),
-              sc: b.width / lb.w,
-            };
-          }
-
-          /* The entrance sequence, dependency-free: it runs immediately from
-             this pre-CDN block, so a hung CDN can never strand the cover. It
-             drives the five plates — fly in from the wings, fan, settle onto
-             the real book, cross-fade, hot-stamp the name. */
-          let fallbackAnims = [];
-          /* Keyframes are rebuilt, not captured once: `flipFor(i)` is evaluated
-             here, at call time, so re-running this after a resize re-targets the
-             plates at the book's NEW position and width. */
-          function fallbackKeys(i) {
-            const dir = i % 2 === 0 ? -1 : 1;
-            const off = i - 2; // -2 .. 2
-            const spread = Math.min(150, window.innerWidth * 0.11);
-            const f = flipFor(i) || { dx: 0, dy: 0, sc: 1 };
-            return [
-              {
-                opacity: 0,
-                transform:
-                  "translateX(" + dir * 62 + "vw) rotate(" + dir * -14 + "deg) scale(0.8)",
-              },
-              {
-                opacity: 1,
-                transform:
-                  "translate(" + off * spread + "px," + Math.abs(off) * 18 + "px) rotate(" + off * 5 + "deg) scale(1)",
-                offset: 0.38,
-              },
-              {
-                opacity: 1,
-                transform:
-                  "translate(" + f.dx + "px," + f.dy + "px) rotate(0deg) scale(" + f.sc + ")",
-                offset: 0.74,
-              },
-              {
-                opacity: 0,
-                transform:
-                  "translate(" + f.dx + "px," + f.dy + "px) rotate(0deg) scale(" + f.sc + ")",
-              },
+          /* ---- the drawn entrance: 100% CSS; JS only arms it -------------------
+             The whole sequence is @keyframes + animation-delay, so there is no CDN
+             dependency left in the entrance: a hung jsDelivr can no longer strand
+             the cover. JS does three things only — build the spark, hold the
+             .is-live trigger until the portrait has decoded, and keep a resolve
+             timer armed from .is-live itself (J2-6). */
+          function buildBurst() {
+            if (!stage || stage.querySelector(".intro-burst")) return;
+            var NS = "http://www.w3.org/2000/svg";
+            /* Hand-placed literals, no PRNG: byte-identical every load and every
+               value auditable (J3-14). 1 core + 8 rays + 6 stars + 9 motes = 24. */
+            var RAY = [72, 118, 88, 132, 76, 124, 92, 110];
+            var STAR = [
+              [-58, -44, 0.9, -160], [66, -38, 1.1, 200], [84, 40, 0.8, -120],
+              [44, 92, 1.0, 260], [-72, 56, 0.9, 160], [-92, -18, 1.2, -240],
             ];
+            var MOTE = [
+              [-34, -96], [58, -72], [96, -8], [70, 84], [6, 108],
+              [-64, 74], [-104, 6], [-46, -40], [30, 30],
+            ];
+            var SPRITE = [
+              "particle-jasmine-flower", "particle-jasmine-leaf", "particle-sparkle",
+            ];
+            var rays = "", stars = "", motes = "", i, a;
+            for (i = 0; i < 8; i++) {
+              a = (i * 45 * Math.PI) / 180;
+              rays +=
+                '<line class="ray" style="--len:' + (RAY[i] + 4) + ";--dd:" + i * 22 +
+                'ms" x1="200" y1="200" x2="' + (200 + RAY[i] * Math.cos(a)).toFixed(1) +
+                '" y2="' + (200 + RAY[i] * Math.sin(a)).toFixed(1) + '"/>';
+            }
+            for (i = 0; i < 6; i++) {
+              stars +=
+                '<path class="spark spark--star" style="--sx:' + STAR[i][0] + "px;--sy:" +
+                STAR[i][1] + "px;--k:" + STAR[i][2] + ";--spin:" + STAR[i][3] +
+                'deg;--dd:' + (60 + i * 28) + 'ms" ' +
+                'd="M0-6L1.55-1.55L6 0L1.55 1.55L0 6L-1.55 1.55L-6 0L-1.55-1.55Z"/>';
+            }
+            for (i = 0; i < 9; i++) {
+              motes +=
+                '<image class="spark spark--mote" style="--sx:' + MOTE[i][0] +
+                "px;--sy:" + MOTE[i][1] + "px;--dd:" + (100 + i * 30) + 'ms" ' +
+                'x="189" y="189" width="22" height="22" href="/chin-portfolio/' +
+                SPRITE[i % 3] + '.webp"/>';
+            }
+            var svg = document.createElementNS(NS, "svg");
+            svg.setAttribute("class", "intro-burst");
+            svg.setAttribute("viewBox", "0 0 400 400");
+            svg.setAttribute("aria-hidden", "true");
+            svg.setAttribute("focusable", "false");
+            svg.innerHTML =
+              '<circle class="core" cx="200" cy="200" r="7"/>' +
+              '<g class="rays">' + rays + "</g>" +
+              '<g class="sparks">' + stars + motes + "</g>";
+            stage.appendChild(svg);
           }
-          function runFallback() {
+
+          function armDraw(resolveAfter) {
             if (ctl.started) return;
             ctl.started = true;
-            fallbackAnims = [];
-            plates.forEach(function (p, i) {
-              fallbackAnims.push(
-                p.animate(fallbackKeys(i), {
-                  duration: 2050,
-                  delay: i * 70,
-                  easing: "ease-in-out",
-                  fill: "forwards",
-                }),
-              );
-            });
-            /* The portrait (last plate) holds opacity 1 through offset 0.74,
-               then fades to 0 by the end of its 2050ms run — plus its 280ms
-               stagger, that is ~2.33s. The stamp starts exactly there, so it
-               lands on empty ground — never on the book, and with no dead flash
-               because the two meet at zero. */
-            stampEls.forEach(function (el, i) {
-              el.animate(
-                [
-                  { opacity: 0, transform: "translateY(10px)" },
-                  { opacity: 1, transform: "translateY(0)" },
-                ],
-                {
-                  duration: 340,
-                  delay: 2330 + i * 80,
-                  easing: "ease-out",
-                  fill: "forwards",
-                },
-              );
-            });
-            /* The sequence resolves onto the portrait plate and the cover
-               STAYS: no dismiss here. The backstop is only the stall guard —
-               if the WAAPI sequence never finishes (tab backgrounded, an error),
-               resolveIntro() still runs so the Continue button appears rather
-               than leaving the visitor stranded. */
-            ctl.backstopId = setTimeout(function () {
-              if (ctl.closed) return;
-              resolveIntro();
-            }, 2700);
+            buildBurst();
+
+            function go() {
+              requestAnimationFrame(function () {
+                if (ctl.closed) return;
+                stage.classList.add("is-live");
+                /* Armed AFTER the class add, in the rAF: the deadline is measured
+                   from .is-live, not from armDraw() (J2-6). */
+                ctl.backstopId = setTimeout(function () {
+                  if (ctl.closed) return;
+                  resolveIntro();
+                }, resolveAfter);
+              });
+            }
+
+            /* Never start the draw before the portrait exists — the drawing IS the
+               reveal. `plates[plates.length - 1]` is the portrait, already resolved
+               at 5834; no attribute-substring selector (J2-13, J3-5). The 400ms cap
+               guarantees the entrance never waits on the network. */
+            var ready = [];
+            var portrait = plates[plates.length - 1];
+            var img = portrait && portrait.querySelector("img");
+            if (img && img.decode) ready.push(img.decode().catch(function () {}));
+            else if (img) ready.push(new Promise(function (r) { img.onload = img.onerror = r; }));
+            if (document.fonts && document.fonts.ready) ready.push(document.fonts.ready.catch(function () {}));
+            var cap = new Promise(function (r) { setTimeout(r, 400); });
+            Promise.race([Promise.all(ready), cap]).then(go, go);
           }
 
-          /* Re-seed the keyframes on resize so a viewport change while the
-             cover is up still lands the plates on the book. */
-          function onFallbackResize() {
-            if (!fallbackAnims.length || ctl.closed) return;
-            fallbackAnims.forEach(function (a, i) {
-              if (a.playState !== "idle" && a.effect)
-                a.effect.setKeyframes(fallbackKeys(i));
-            });
-          }
-          window.addEventListener("resize", onFallbackResize);
-
-          /* The five-plate sequence is the whole entrance: run it now. */
-          runFallback();
+          armDraw(3400);                        /* was: runFallback(); */
 
           /* Exposed for teardown + tests. `dismiss` is shared, so a user skip
              always wins the race against any timer. */
           window.__introCtl = {
             stage: stage,
-            plates: plates,
-            stampEls: stampEls,
-            flipFor: flipFor,
             dismiss: dismiss,
             startRiffle: startRiffle,
             resolveIntro: resolveIntro,
