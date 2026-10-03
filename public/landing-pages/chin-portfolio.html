@@ -2034,9 +2034,11 @@
         align-items: center;
         text-align: center;
         pointer-events: none;
-        /* The name "stamps onto the held portrait" (01-concept.md §1). The
-           portrait plate resolves in the same visual centre, so the stamp must
-           paint above it or the right half of the name is occluded. */
+        /* The name "stamps onto the held portrait" (01-concept.md §1): the
+           portrait plate resolves centre-right and the name is centred, so the
+           right half of the name lands ON the pale spread. Both are cream, so
+           without a halo the overlapped letters vanish into the paper. The
+           seat is unchanged; the legibility is bought with a shadow. */
         z-index: 1;
       }
       .intro-kicker,
@@ -2045,6 +2047,12 @@
       .intro-index {
         opacity: 0;
         will-change: transform, opacity;
+        /* The halo that keeps the stamp readable where it crosses the portrait:
+           a dark ground-tinted blur, never a hard outline, so the ink still
+           reads as ink stamped on paper rather than a sticker. Measured over
+           the held plate at both 1440x900 and 390x844 (the two widths the
+           acceptance harness screenshots). */
+        text-shadow: 0 3px 22px rgba(2, 5, 14, .92), 0 1px 7px rgba(2, 5, 14, .8);
       }
       .intro-kicker {
         font-family: var(--font);
