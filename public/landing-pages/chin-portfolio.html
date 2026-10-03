@@ -1784,6 +1784,15 @@
          one viewBox unit is one CSS px times a single uniform scale. */
       .intro-stage {
         --plate-w: min(84vw, 940px, 128vh);
+        /* The held portrait's raise, in ONE place: the plate's inline --y and
+           the exit's settle-to-centre both read it, so the book can never be
+           raised without the exit knowing how far to bring it back down.
+           -24vh (bounded 150–250px) lands the book in the red-marked upper
+           field at 1440x900 (centroid ~26% of the height) and, crucially,
+           SHRINKS on short laptops so the top edge never clips off-screen:
+           the plate box is height-capped, so the book's own height does not
+           shrink with the viewport and a fixed px raise would. */
+        --raise: clamp(-250px, -24vh, -150px);
         perspective: 1400px;      /* for the exit's rotateX; see the exit block */
       }
 
@@ -2095,13 +2104,19 @@
       /* ---- the stamp's seat -------------------------------------------------
          Declared HERE, after the identity block above, on purpose: these two
          override the v1 rules at equal specificity, so they must be later in
-         source. The stamp's BOTTOM sits 6px under the drawn baseline (viewBox
-         y=590, which is --plate-w * .1797 below the stage's centre line), so
-         the name grows upward from the rule and can never collide with the fan
-         or with the Continue button. v1 stage-centred it and the fan fanned
-         over it. */
+         source. The stamp's BOTTOM sits 6px under the drawn baseline, so the
+         name grows upward from the rule and can never collide with the fan or
+         with the Continue button. v1 stage-centred it and the fan fanned over
+         it.
+
+         The seat is pulled UP from the raw baseline (--plate-w * .1797) to
+         --plate-w * .14: once the portrait is held high in the red-marked
+         upper field, the identity reads best as one centred block under it
+         rather than pinned low on a rule the eye has stopped seeing. .14 is
+         the largest pull that still clears the raised portrait by ~19px at
+         1440x900, so the book can never back the text. */
       .intro-stamp {
-        top: calc(50% + var(--plate-w) * .1797 + 6px);
+        top: calc(50% + var(--plate-w) * .14 + 6px);
         transform: translateY(-100%);
       }
 
@@ -2263,7 +2278,12 @@
 
       /* ---- the lift and the turn -------------------------------------------
          One element carries both: the plate box, which holds the sheet and the
-         ruling. `.is-lifting` rises 26% of its own height; `.is-turn` then
+         ruling. The lift does TWO things at once — it cancels the portrait's
+         fan offset (left by -2*spread, the portrait's --i minus the centre)
+         and brings it DOWN from its raised seat (-1 * --raise), so the book
+         travels from the red-marked upper field into the stage's exact centre:
+         the same centred position the real .sb-book#sbBook occupies on the next
+         page, which is the whole point of the hand-off. `.is-turn` then
          rotates it away about its top edge while the cover fades over the same
          840ms, so the riffle that starts at the same instant (+400) is on
          screen for its whole run instead of playing behind an opaque cover.
@@ -2271,7 +2291,7 @@
          +400 → +1240 and lands exactly on dismiss(). */
       .intro-stage.is-lifting .intro-plate-draw {
         transition: transform 780ms cubic-bezier(.22, .61, .36, 1);
-        transform: translate3d(0, -26%, 0);
+        transform: translate3d(calc(-2 * var(--spread)), calc(-1 * var(--raise)), 0);
         will-change: transform;
       }
       .intro-stage.is-lifting .intro-plate-draw:before { opacity: 1 }
@@ -2280,7 +2300,7 @@
 
       .intro-stage.is-turn .intro-plate-draw {
         transition: transform 840ms cubic-bezier(.33, 1, .68, 1);
-        transform: translate3d(0, -26%, 0) rotateX(-88deg);
+        transform: translate3d(calc(-2 * var(--spread)), calc(-1 * var(--raise)), 0) rotateX(-88deg);
       }
       .intro-stage.is-turn {
         opacity: 0;
@@ -3519,7 +3539,7 @@
               decoding="async"
             />
           </div>
-          <div class="intro-plate" style="--i:4;--dir:-1;--y:36px">
+          <div class="intro-plate" style="--i:4;--dir:-1;--y:var(--raise)">
             <img
               src="/chin-portfolio/portrait-intro.webp"
               alt=""
