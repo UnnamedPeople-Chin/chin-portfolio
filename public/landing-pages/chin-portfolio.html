@@ -2034,6 +2034,10 @@
         align-items: center;
         text-align: center;
         pointer-events: none;
+        /* The name "stamps onto the held portrait" (01-concept.md §1). The
+           portrait plate resolves in the same visual centre, so the stamp must
+           paint above it or the right half of the name is occluded. */
+        z-index: 1;
       }
       .intro-kicker,
       .intro-name,
