@@ -6751,79 +6751,21 @@
           });
 
           if (MOBILE) {
-            /* No fan on phones — the four project plates fade through, the
-               portrait plate (last in DOM order, so top of the pile) settles
-               in, holds a beat, then dissolves. What remains is the name and
-               the Continue button. Short on purpose so a tap-through never
-               feels like a stall, but the entrance still resolves rather than
-               blinking straight to the page. */
-            plates.forEach(function (p, i) {
-              if (i === plates.length - 1) {
-                /* the portrait plate: fade in, hold long enough to read, then
-                   dissolve — so the entrance is left with just the name and
-                   the Continue button, not a held photograph. */
-                var portraitAnim = p.animate(
-                  [
-                    { opacity: 0, transform: "scale(0.96)" },
-                    { opacity: 1, transform: "scale(1)", offset: 0.34 },
-                    { opacity: 1, transform: "scale(1)", offset: 0.62 },
-                    { opacity: 0, transform: "scale(1.03)" },
-                  ],
-                  {
-                    duration: 1500,
-                    delay: i * 55,
-                    easing: "ease-in-out",
-                    fill: "forwards",
-                  },
-                );
-                /* Offer Continue the moment the portrait has finished
-                   dissolving, not on the backstop timer; the timer stays as the
-                   stall guard (a cancelled animation rejects `finished`). */
-                if (portraitAnim && portraitAnim.finished) {
-                  portraitAnim.finished
-                    .then(function () {
-                      if (!ctl.closed) resolveIntro();
-                    })
-                    .catch(function () {});
-                }
-                return;
-              }
-              p.animate(
-                [
-                  { opacity: 0, transform: "scale(0.94)" },
-                  { opacity: 1, transform: "scale(1)", offset: 0.5 },
-                  { opacity: 0, transform: "scale(1)" },
-                ],
-                {
-                  duration: 560,
-                  delay: i * 55,
-                  easing: "ease-out",
-                  fill: "forwards",
-                },
-              );
-            });
-            /* The stamp lands as the portrait is essentially gone (its fade-out
-               ends at ~1.72s with the 220ms stagger). It starts a beat before
-               that, when the book is already ~90% faded, so the name never reads
-               as sitting on the book and there is no dead flash between them. */
-            stampEls.forEach(function (el, i) {
-              el.animate(
-                [
-                  { opacity: 0, transform: "translateY(8px)" },
-                  { opacity: 1, transform: "translateY(0)" },
-                ],
-                {
-                  duration: 300,
-                  delay: 1680 + i * 60,
-                  easing: "ease-out",
-                  fill: "forwards",
-                },
-              );
-            });
+            /* The mobile ladder is 100% CSS now (06-paths.md §3): the plates, the
+               portrait and the stamps are @keyframes with scaled delays, so the
+               branch's only jobs are to arm the draw and keep the local resolve
+               guard. armDraw() builds the spark and holds .is-live until the
+               portrait has decoded. */
+            armDraw(3600);   /* the CSS ladder is compressed by the
+                                @media (max-width:640px) block; the only
+                                mobile-specific number left is the deadline. */
             backstop = setTimeout(function () {
+              /* The LOCAL timer stays: it is the one guard that fires even
+                 if .is-live never lands (armDraw's own timer is armed inside
+                 go()'s rAF, which needs .is-live). dismiss() clears it. */
               if (ctl.closed) return;
               resolveIntro();
-            }, 2300);
+            }, 3600);
             return;
           }
 
