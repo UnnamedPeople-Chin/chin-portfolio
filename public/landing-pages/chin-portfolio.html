@@ -1784,9 +1784,10 @@
          one viewBox unit is one CSS px times a single uniform scale. */
       .intro-stage {
         --plate-w: min(84vw, 940px, 128vh);
-        /* The held portrait's raise, in ONE place: the plate's inline --y and
-           the exit's settle-to-centre both read it, so the book can never be
-           raised without the exit knowing how far to bring it back down.
+        /* The held portrait's raise, in ONE place: the raise keyframes' end
+           state (cp-plate-raise) and the exit's settle-to-centre both read
+           it, so the book can never be raised without the exit knowing how
+           far to bring it back down.
            -24vh (bounded 150–250px) lands the book in the red-marked upper
            field at 1440x900 (centroid ~26% of the height) and, crucially,
            SHRINKS on short laptops so the top edge never clips off-screen:
@@ -1998,6 +1999,16 @@
           cp-plate 1400ms cubic-bezier(.22, .61, .36, 1) 900ms forwards,
           cp-plate-clear 400ms ease-in 2300ms forwards;
       }
+      /* The held portrait: sits IN the fan's arc (--y:36px, mirroring i=0) so
+         the five plates read as one row, then — only after the four project
+         plates have faded (clear ends 2700) — rises to its seat. The rise is
+         its own beat: 2700 → 3360, landing just before the resolve at 3400,
+         so the visitor sees the book travel up before the Continue appears. */
+      .intro-stage.is-live .intro-plate--raise {
+        animation:
+          cp-plate 1400ms cubic-bezier(.22, .61, .36, 1) 900ms forwards,
+          cp-plate-raise 660ms cubic-bezier(.22, .61, .36, 1) 2700ms forwards;
+      }
       @keyframes cp-plate {
         0%   { opacity: 0;
                transform: translate3d(calc(var(--dir, -1) * -62vw), var(--y, 0px), 0)
@@ -2012,6 +2023,17 @@
       /* Only the four PROJECT plates (--clear) fade. The portrait stays, and
          the strike is revealed behind it as they go. */
       @keyframes cp-plate-clear { to { opacity: 0 } }
+      /* The raise is its own beat, NOT the plate's arrival: the 0% is the
+         portrait's settled fan pose (--y:36px, mirroring i=0), the 100% is
+         its raised seat (--raise). 660ms from 2700 — after the last clear
+         (ends 2700), landing at 3360 just before the 3400 resolve, so the
+         visitor reads "in line → the others go → the book rises". */
+      @keyframes cp-plate-raise {
+        0%   { transform: translate3d(calc((var(--i, 0) - 2) * var(--spread)), var(--y, 0px), 0)
+                         rotate(calc((var(--i, 0) - 2) * 5deg)) scale(1) }
+        100% { transform: translate3d(calc((var(--i, 0) - 2) * var(--spread)), var(--raise), 0)
+                         rotate(calc((var(--i, 0) - 2) * 5deg)) scale(1) }
+      }
 
       /* ---- the identity, seated on the drawing -----------------------------
          The stamp's seat is declared after the identity block below, so it
@@ -2111,8 +2133,9 @@
          over it.
 
          SEAT LOCKED: this is the identity's own position and does not move
-         with the held portrait. The portrait is raised by --raise alone (see
-         .intro-stage), so the ONLY thing that travels up is the sketchbook. */
+         with the held portrait. The portrait is raised by cp-plate-raise
+         alone (see .intro-stage), so the ONLY thing that travels up is the
+         sketchbook. */
       .intro-stamp {
         top: calc(50% + var(--plate-w) * .1797 + 6px);
         transform: translateY(-100%);
@@ -2356,6 +2379,15 @@
             cp-plate 1000ms cubic-bezier(.22,.61,.36,1)
               calc(560ms + var(--i,0) * 70ms) forwards,
             cp-plate-clear 400ms ease-in 1840ms forwards;
+        }
+        /* The portrait's two beats, mobile ladder: in the arc with the others
+           (arrives 840, ends 1840), then — after the clears end 2240 — rises
+           660ms, landing 2900, well inside the 3600 resolve deadline. */
+        .intro-stage.is-live .intro-plate--raise{
+          animation:
+            cp-plate 1000ms cubic-bezier(.22,.61,.36,1)
+              calc(560ms + var(--i,0) * 70ms) forwards,
+            cp-plate-raise 660ms cubic-bezier(.22,.61,.36,1) 2240ms forwards;
         }
 
         /* --- the identity: 2010 + i*70, 480ms; last ends 2700 (2220+480) --- */
@@ -3498,8 +3530,10 @@
              (alternating, so the five arrive from both sides), --y arcs the
              row (outer two 36px below centre, inner two 18px). The four
              PROJECT plates carry --clear so they fade at the exit; the
-             portrait (i=4) does not — it is the top of the pile, the plate
-             left showing when the fan settles. DOM order is load-bearing. -->
+             portrait (i=4) carries --raise instead — it joins the fan's arc
+             (--y:36px, the same slot as i=0, so the row is symmetric) and
+             only AFTER the four have faded does it rise to its seat. DOM
+             order is load-bearing. -->
         <div class="intro-deck" id="introDeck">
           <div class="intro-plate intro-plate--clear" style="--i:0;--dir:-1;--y:36px">
             <img
@@ -3537,7 +3571,7 @@
               decoding="async"
             />
           </div>
-          <div class="intro-plate" style="--i:4;--dir:-1;--y:var(--raise)">
+          <div class="intro-plate intro-plate--raise" style="--i:4;--dir:-1;--y:36px">
             <img
               src="/chin-portfolio/portrait-intro.webp"
               alt=""

@@ -900,6 +900,66 @@ try {
     `schedule max in flight ${a7.max} (<=6) over ${a7.attached} drawables; live ${a7live} mid-draw [corrected from <=4]`,
   );
 
+  // A8: the held portrait's two beats, in order. It must (1) sit IN the fan's
+  // arc — --y:36px, the same slot as i=0, so the five read as one row — and
+  // (2) carry the raise as its OWN keyframe, scheduled AFTER the clears, not
+  // on the plate's arrival. The regression this locks: the portrait was raised
+  // from the first frame (--y:var(--raise) inline), so the "in line" phase
+  // never happened. Assert the declared schedule (deterministic) plus the live
+  // resting transform — the same form as A3/A4/A6. The live `lift` read needs
+  // the raise to have LANDED (3360), so wait on A7's own t0 first; the entrance
+  // then holds until Continue, so any later read is still the settled seat.
+  await sleep(Math.max(0, tA7 + 3400 - Date.now()));
+  const a8 = await s.eval(`(() => {
+    const p = document.querySelector('.intro-plate--raise');
+    if (!p) return { missing: true };
+    const img = p.querySelector('img');
+    const c = getComputedStyle(p);
+    const names = c.animationName.split(',').map(s => s.trim());
+    const delays = c.animationDelay.split(',').map(v => parseFloat(v) * 1000);
+    const durs = c.animationDuration.split(',').map(v => parseFloat(v) * 1000);
+    const raiseIdx = names.indexOf('cp-plate-raise');
+    const clearEl = document.querySelector('.intro-plate--clear');
+    const cc = clearEl ? getComputedStyle(clearEl) : null;
+    const clearNames = cc ? cc.animationName.split(',').map(s => s.trim()) : [];
+    const clearDurs = cc ? cc.animationDuration.split(',').map(v => parseFloat(v) * 1000) : [];
+    const clearDelays = cc ? cc.animationDelay.split(',').map(v => parseFloat(v) * 1000) : [];
+    const ci = clearNames.indexOf('cp-plate-clear');
+    return {
+      missing: false,
+      y: parseFloat(c.getPropertyValue('--y')) || 0,
+      src: img ? img.getAttribute('src') : '',
+      hasRaise: raiseIdx >= 0,
+      raiseDelay: raiseIdx >= 0 ? delays[raiseIdx] : -1,
+      raiseEnd: raiseIdx >= 0 ? delays[raiseIdx] + durs[raiseIdx] : -1,
+      raiseName: raiseIdx >= 0 ? names[raiseIdx] : '',
+      clearEnd: ci >= 0 ? clearDelays[ci] + clearDurs[ci] : -1,
+      // Live cross-check of the SETTLED seat: the raised portrait's centre
+      // must sit clearly ABOVE its arc twin (the i=0 plate, --y:36px). The
+      // raise rotates about the centre, so it does not move the rect's
+      // centreY; only the y translate does. The check runs at t0+3400, after
+      // the raise lands (3360), so this reads the settled seat.
+      lift: (() => {
+        const i0 = document.querySelector('.intro-plate[style*="--i:0"]');
+        if (!i0) return -1;
+        const pr = p.getBoundingClientRect();
+        const r0 = i0.getBoundingClientRect();
+        return Math.round((r0.top + r0.height / 2) - (pr.top + pr.height / 2));
+      })(),
+    };
+  })()`);
+  check(
+    'A8',
+    !a8.missing &&
+      /portrait-intro\.webp$/.test(a8.src) &&
+      a8.y === 36 &&
+      a8.raiseName === 'cp-plate-raise' &&
+      a8.raiseDelay >= a8.clearEnd - 1 &&
+      a8.raiseEnd <= 3400 &&
+      a8.lift > 100,
+    `portrait in the arc (--y ${a8.y}px) then raises at ${a8.raiseDelay}ms (after clears end ${a8.clearEnd}), landing ${a8.raiseEnd}ms <= 3400; settled ${a8.lift}px above its arc twin`,
+  );
+
   // ------------------------------------------------- the two frames a human reads
   // 02/03 are taken on their own clean loads (a capture round-trip mid-walk
   // would eat the very exit window they are meant to show).
