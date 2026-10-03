@@ -2505,9 +2505,14 @@
         right:clamp(14px,2vw,26px);
         bottom:clamp(14px,2vw,26px);
         z-index:420;
-        display:flex;
+        display:grid;
+        grid-template-columns:auto minmax(0,1fr) auto;
+        grid-template-areas:
+          "art meta actions"
+          "seek seek seek";
         align-items:center;
-        gap:12px;
+        column-gap:12px;
+        row-gap:7px;
         padding:10px 12px;
         border:1px solid var(--hairline);
         border-radius:14px;
@@ -2533,6 +2538,7 @@
       /* Art: square cover plate with a vinyl disc that slides out on hover.
          The disc only spins while the preview is actually playing. */
       .np-art{
+        grid-area:art;
         position:relative;
         flex:0 0 auto;
         width:54px;
@@ -2579,6 +2585,7 @@
 
       /* Meta: label + equalizer, then title and artist on their own lines. */
       .np-meta{
+        grid-area:meta;
         display:flex;
         flex-direction:column;
         gap:3px;
@@ -2638,6 +2645,7 @@
 
       /* Actions: play/pause toggle (its own button) + mute toggle. */
       .np-actions{
+        grid-area:actions;
         display:flex;
         align-items:center;
         gap:2px;
@@ -2672,6 +2680,87 @@
       .np-card.is-playing .np-play .np-ic-play{display:none}
       .np-card.is-playing .np-play .np-ic-pause{display:block}
 
+      /* Seek row: a full-width scrub bar under the meta row. The fill is
+         driven by --np-fill (a percentage the script writes on timeupdate),
+         so the gold progress and the thumb agree in every engine; Firefox
+         gets its own ::-moz-range-progress instead. The time label is
+         tabular-nums so it does not jitter while the seconds tick. */
+      .np-seek{
+        grid-area:seek;
+        display:flex;
+        align-items:center;
+        gap:8px;
+        min-width:0;
+      }
+      .np-range{
+        flex:1 1 auto;
+        min-width:0;
+        height:14px;
+        margin:0;
+        padding:0;
+        background:transparent;
+        cursor:pointer;
+        -webkit-appearance:none;
+        appearance:none;
+      }
+      .np-range:focus-visible{outline:2px solid var(--earth);outline-offset:2px;border-radius:6px}
+      .np-range::-webkit-slider-runnable-track{
+        height:3px;
+        border-radius:2px;
+        background:linear-gradient(90deg,
+          var(--earth) 0 var(--np-fill,0%),
+          rgba(239,231,214,.18) var(--np-fill,0%) 100%);
+      }
+      .np-range::-moz-range-track{
+        height:3px;
+        border-radius:2px;
+        background:rgba(239,231,214,.18);
+      }
+      .np-range::-moz-range-progress{
+        height:3px;
+        border-radius:2px;
+        background:var(--earth);
+      }
+      .np-range::-webkit-slider-thumb{
+        -webkit-appearance:none;
+        width:10px;
+        height:10px;
+        margin-top:-3.5px;
+        border:0;
+        border-radius:50%;
+        background:var(--ink);
+        box-shadow:0 1px 3px rgba(2,5,14,.65);
+        transition:transform .2s ease,background .2s ease;
+      }
+      .np-range::-moz-range-thumb{
+        width:10px;
+        height:10px;
+        border:0;
+        border-radius:50%;
+        background:var(--ink);
+        box-shadow:0 1px 3px rgba(2,5,14,.65);
+        transition:transform .2s ease,background .2s ease;
+      }
+      .np-range:hover::-webkit-slider-thumb,
+      .np-range:focus-visible::-webkit-slider-thumb{
+        transform:scale(1.25);
+        background:var(--earth-text);
+      }
+      .np-range:hover::-moz-range-thumb,
+      .np-range:focus-visible::-moz-range-thumb{
+        transform:scale(1.25);
+        background:var(--earth-text);
+      }
+      .np-time{
+        flex:0 0 auto;
+        font-size:10px;
+        line-height:1;
+        letter-spacing:.05em;
+        font-variant-numeric:tabular-nums;
+        color:var(--ink-faint-text);
+        white-space:nowrap;
+      }
+
       @keyframes np-in{
         to{opacity:1;transform:translateY(0)}
       }
@@ -2687,7 +2776,8 @@
         .np-card{
           right:12px;
           bottom:12px;
-          gap:9px;
+          column-gap:9px;
+          row-gap:5px;
           padding:8px 9px;
           border-radius:12px;
         }
@@ -7185,24 +7275,41 @@
           </svg>
         </button>
       </span>
+      <span class="np-seek">
+        <input
+          class="np-range"
+          type="range"
+          min="0"
+          max="0"
+          step="0.1"
+          value="0"
+          aria-label="Seek backsound"
+        />
+        <span class="np-time" aria-hidden="true">0:00</span>
+      </span>
       <audio
         class="np-audio"
         src="/chin-portfolio/backsound.mp3"
-        preload="metadata"
+        preload="auto"
         loop
       ></audio>
     </div>
     <script>
       /* Backsound card: a local track (no token, no API, no expiry).
          Play/pause drives the disc spin and the equalizer; the second
-         button toggles mute. */
+         button toggles mute; the range scrubs. The track tries to start
+         the moment the page opens, and falls back to the first user
+         gesture (in practice the cover's Continue button) when the
+         browser refuses an unmuted autoplay. */
       (function () {
         var card = document.querySelector(".np-card");
         if (!card) return;
         var audio = card.querySelector(".np-audio");
         var play = card.querySelector(".np-play");
         var mute = card.querySelector(".np-mute");
-        if (!audio || !play || !mute) return;
+        var range = card.querySelector(".np-range");
+        var timeEl = card.querySelector(".np-time");
+        if (!audio || !play || !mute || !range || !timeEl) return;
         var setState = function (on) {
           card.classList.toggle("is-playing", on);
           play.setAttribute("aria-pressed", on ? "true" : "false");
@@ -7225,6 +7332,100 @@
         mute.addEventListener("click", function () { setMute(!audio.muted); });
         audio.addEventListener("play", function () { setState(true); });
         audio.addEventListener("pause", function () { setState(false); });
+
+        /* ── Autoplay, with a one-shot gesture fallback ────────────────
+           play() is attempted immediately. A browser that refuses an
+           unmuted autoplay (NotAllowedError) leaves the unlock listeners
+           armed; the first gesture anywhere starts the track — except a
+           gesture inside this card, which already IS a gesture, so the
+           card's own buttons handle it and the pre-kick must not eat
+           their click. Once playback has begun the listeners are removed
+           for good, so a later manual pause is never overridden. */
+        var started = false;
+        var kick = function () {
+          var p = audio.play();
+          if (p && p.catch) p.catch(function () {});
+        };
+        var onFirst = function (ev) {
+          if (started) return;
+          var t = ev && ev.target;
+          if (t && t.closest && t.closest(".np-card")) return;
+          kick();
+        };
+        var disarm = function () {
+          document.removeEventListener("pointerdown", onFirst, true);
+          document.removeEventListener("keydown", onFirst, true);
+          document.removeEventListener("touchend", onFirst, true);
+        };
+        audio.addEventListener("play", function () {
+          started = true;
+          disarm();
+        });
+        document.addEventListener("pointerdown", onFirst, true);
+        document.addEventListener("keydown", onFirst, true);
+        document.addEventListener("touchend", onFirst, true);
+        kick();
+
+        /* ── Scrub bar ────────────────────────────────────────────────
+           The thumb and the gold fill are driven from currentTime; the
+           duration lands with the metadata, and is re-read on every
+           durationchange because a looped track can report it late.
+           While a drag is in flight the thumb belongs to the pointer,
+           so timeupdate is not allowed to fight it. */
+        var dragging = false;
+        var fmt = function (s) {
+          if (!isFinite(s) || s < 0) s = 0;
+          var m = Math.floor(s / 60);
+          var sec = Math.floor(s % 60);
+          return m + ":" + (sec < 10 ? "0" : "") + sec;
+        };
+        var label = function (v, d) {
+          return fmt(v) + " / " + fmt(d);
+        };
+        var fill = function (v, d) {
+          if (isFinite(d) && d > 0) {
+            range.style.setProperty("--np-fill", (v / d) * 100 + "%");
+          }
+        };
+        var sync = function () {
+          var d = audio.duration;
+          if (isFinite(d) && d > 0 && parseFloat(range.max) !== d) {
+            range.max = d;
+          }
+          range.value = audio.currentTime;
+          fill(audio.currentTime, d);
+          timeEl.textContent = label(audio.currentTime, d);
+        };
+        var onMeta = function () {
+          var d = audio.duration;
+          if (isFinite(d) && d > 0) range.max = d;
+          sync();
+        };
+        audio.addEventListener("loadedmetadata", onMeta);
+        audio.addEventListener("durationchange", onMeta);
+        audio.addEventListener("timeupdate", function () {
+          if (!dragging) sync();
+        });
+        range.addEventListener("input", function () {
+          dragging = true;
+          var v = parseFloat(range.value) || 0;
+          var d = audio.duration;
+          timeEl.textContent = label(v, d);
+          fill(v, d);
+          if (isFinite(d) && d > 0) {
+            try { audio.currentTime = v; } catch (e) {}
+          }
+        });
+        range.addEventListener("change", function () {
+          dragging = false;
+          sync();
+        });
+        window.addEventListener("pointerup", function () {
+          if (dragging) {
+            dragging = false;
+            sync();
+          }
+        });
       })();
     </script>
     <script>
