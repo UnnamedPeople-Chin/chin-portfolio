@@ -179,6 +179,11 @@
       @property --accent{syntax:'<color>';inherits:true;initial-value:#C6A053}
       @property --accent-text{syntax:'<color>';inherits:true;initial-value:#DDBE78}
       @property --accent-ink{syntax:'<color>';inherits:true;initial-value:#10172B}
+      /* Registered so the masked-reveal wipe can be transitioned: an
+         unregistered custom property is a string and jumps between its two
+         values, while a registered <percentage> interpolates. See
+         `.reveal-wipe` below. */
+      @property --wipe{syntax:'<percentage>';inherits:false;initial-value:-30%}
 
       /* ---- ENGRAVED NIGHT ----
          The page is one deliberately dark world: a copper-plate etching.
@@ -301,6 +306,25 @@
         background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
         mix-blend-mode:overlay;
       }
+      /* ---- Canvas grid ----
+         A faint cream drafting grid: the page's "sketch paper". It sits UNDER
+         every ornament and every piece of content (negative z-index), so it can
+         never touch legibility, and the radial mask feathers it out toward the
+         edges so the page does not read as a hard-edged table. It shares
+         z-index:-1 with `.grain` but comes later in the DOM, so its hairlines
+         paint over the stipple yet stay under the screen-blended `.orn` plates
+         (z-index:0) and under all in-flow text. Static: no JS, no reduced-motion
+         variant — a still grid is not motion. */
+      .grid-paper{
+        position:fixed;inset:0;z-index:-1;pointer-events:none;
+        --grid-cell:64px;
+        background-image:
+          repeating-linear-gradient(90deg,rgba(239,231,214,.05) 0 1px,transparent 1px var(--grid-cell)),
+          repeating-linear-gradient(0deg, rgba(239,231,214,.05) 0 1px,transparent 1px var(--grid-cell));
+        -webkit-mask-image:radial-gradient(125% 95% at 50% 38%,#000 52%,transparent 100%);
+                mask-image:radial-gradient(125% 95% at 50% 38%,#000 52%,transparent 100%);
+      }
+      @media (max-width:640px){ .grid-paper{--grid-cell:44px} }
       .top .name{
         position:relative;
         font-family:var(--display);font-size:clamp(24px,2.4vw,30px);letter-spacing:.01em;
@@ -840,6 +864,32 @@
       .section-head .rule{
         margin:clamp(6px,1.2vh,12px) auto clamp(8px,1.5vh,16px);
       }
+      /* ---- Light wipe ----
+         A cream band sweeps across a section once as it enters (the reference's
+         brush/light pass), then fades out. It is clipped to the section by the
+         wrapper's overflow:hidden, so the ::before's +-60% travel can never widen
+         the page. NOTE: the wrapper carries NO z-index on purpose — `z-index:0`
+         on a positioned element would create a stacking context, which would
+         isolate the ::before and make its mix-blend-mode:screen blend against
+         nothing instead of against the page. Left at `z-index:auto` it stays a
+         plain positioned box, so the screen blend lifts the navy ground as light
+         rather than veiling it. Peak alpha is only .14 and it always ends at
+         opacity:0, so the page is never left light. */
+      .light-sweep{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+      .light-sweep::before{
+        content:"";position:absolute;inset:0;opacity:0;transform:translateX(-60%);
+        background:linear-gradient(100deg,rgba(239,231,214,0) 0%,rgba(239,231,214,.10) 42%,
+          rgba(239,231,214,.14) 50%,rgba(239,231,214,.10) 58%,rgba(239,231,214,0) 100%);
+        mix-blend-mode:screen;
+      }
+      .js .section-block.sweep .light-sweep::before{
+        animation:light-sweep 1.15s cubic-bezier(.4,0,.2,1) forwards;
+      }
+      @keyframes light-sweep{
+        0%{opacity:0;transform:translateX(-60%)}
+        18%{opacity:1}
+        100%{opacity:0;transform:translateX(60%)}
+      }
       .section-kicker{
         font-family:var(--font);
         font-size:11.5px;
@@ -942,6 +992,11 @@
            all and a new plate can never be forgotten here. */
         .orn{opacity:var(--o, .18) !important}
         .orn.scroll-reveal{opacity:var(--o, .18) !important}
+        /* The wipe mask and the light sweep are motion. Under reduced motion the
+           observer never runs, so both are neutralised here: nothing may be left
+           masked, and no section may be left mid-sweep. */
+        .js .scroll-reveal.reveal-wipe{-webkit-mask-image:none !important;mask-image:none !important}
+        .light-sweep{display:none !important}
       }
       .bloom{
         width:clamp(150px,17vw,260px);opacity:.9;user-select:none;align-self:center;max-width:100%;height:auto;
@@ -1161,6 +1216,27 @@
           opacity: 1;
           transform: translateY(0) translateX(0) rotate(0) scaleX(1);
         }
+
+        /* ---- Masked reveal ----
+           A section head (and its brush rule) is unveiled by a moving mask edge —
+           100deg, so it sweeps up-and-right — instead of a flat fade. --wipe is a
+           registered <percentage>, so the browser interpolates it; the mask's hard
+           stop rides from -30% (the whole box is transparent) to 130% (the whole
+           box is opaque), and the 30% soft edge is the wipe's leading feather.
+           If @property is unsupported the value does not interpolate but still
+           substitutes, so .is-visible flips it straight to 130% and the element is
+           fully visible — never stuck hidden. The element keeps `.scroll-reveal`,
+           so the existing observer, the per-section stagger and the reduced-motion
+           / no-JS guards all still apply. */
+        .js .scroll-reveal.reveal-wipe{
+          --wipe:-30%;
+          -webkit-mask-image:linear-gradient(100deg,#000 calc(var(--wipe) - 30%),transparent var(--wipe));
+                  mask-image:linear-gradient(100deg,#000 calc(var(--wipe) - 30%),transparent var(--wipe));
+          transition:--wipe .9s cubic-bezier(.4,0,.2,1),
+                     opacity .8s cubic-bezier(.25,.46,.45,.94),
+                     transform .8s cubic-bezier(.25,.46,.45,.94);
+        }
+        .js .scroll-reveal.reveal-wipe.is-visible{ --wipe:130%; }
 
         /* ---- Scroll Progress Brush Stroke ---- */
         .scroll-progress-brush {
@@ -1587,6 +1663,20 @@
       }
       @media(min-width:681px){
         .contact-list{display:none}
+      }
+      /* On phones the BounceCards fan is hidden and this list stands in for it,
+         so the cards' rise-from-below is mirrored here: the rows lift in as the
+         section arrives. `.scroll-reveal` is inert on desktop (the list is
+         display:none ≥681px), so this costs nothing there. */
+      @media(max-width:680px){
+        .js .contact-list li.scroll-reveal{
+          transform:translateY(38px);
+          transition:opacity .7s cubic-bezier(.25,.46,.45,.94),
+                     transform .7s cubic-bezier(.25,.46,.45,.94);
+        }
+        .js .contact-list li.scroll-reveal.is-visible{
+          opacity:1;transform:translateY(0);
+        }
       }
 
       .foot{font-size:11.5px;letter-spacing:var(--track-caps);text-transform:uppercase;
@@ -2332,6 +2422,18 @@
         translate: none !important;
         transition: none !important;
       }
+      /* The wipe mask and the light sweep are JS-gated; without scripting they
+         must not exist at all, or a masked head would stay hidden and a sweep
+         could sit over the section. */
+      html:not(.js) .reveal-wipe,
+      html.js-failed .reveal-wipe {
+        -webkit-mask-image: none !important;
+        mask-image: none !important;
+      }
+      html:not(.js) .light-sweep,
+      html.js-failed .light-sweep {
+        display: none !important;
+      }
       html:not(.js) .bc-wrap,
       html.js-failed .bc-wrap {
         height: auto;
@@ -2719,6 +2821,7 @@
 
     <div class="wash" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
+    <div class="grid-paper" aria-hidden="true"></div>
     <main class="page home" id="main">
       <!-- Persistent screen-reader-only page title. The intro stage's name is a
        <p>, not a heading, so this is the page's only <h1>; it also keeps the
@@ -3002,6 +3105,7 @@
       </section>
 
       <section id="about" class="section-block about-wrap">
+        <span class="light-sweep" aria-hidden="true"></span>
         <img
           class="orn orn-statue"
           src="/chin-portfolio/engraved/statue.webp"
@@ -3024,13 +3128,13 @@
         />
         <div class="section-head">
           <div
-            class="rule scroll-reveal scroll-reveal-rule"
+            class="rule scroll-reveal reveal-wipe"
             aria-hidden="true"
           ></div>
-          <span class="section-kicker scroll-reveal scroll-reveal-text"
+          <span class="section-kicker scroll-reveal reveal-wipe"
             >Biography</span
           >
-          <h2 class="section-title scroll-reveal scroll-reveal-text">
+          <h2 class="section-title scroll-reveal reveal-wipe">
             About Me
           </h2>
         </div>
@@ -3099,6 +3203,7 @@
       </section>
 
       <section id="plates" class="section-block plates">
+        <span class="light-sweep" aria-hidden="true"></span>
         <img
           class="orn orn-baroque"
           src="/chin-portfolio/engraved/baroque.webp"
@@ -3117,13 +3222,13 @@
         />
         <div class="section-head">
           <div
-            class="rule short scroll-reveal scroll-reveal-rule"
+            class="rule short scroll-reveal reveal-wipe"
             aria-hidden="true"
           ></div>
-          <span class="section-kicker scroll-reveal scroll-reveal-text"
+          <span class="section-kicker scroll-reveal reveal-wipe"
             >Index of Craft</span
           >
-          <h2 class="section-title scroll-reveal scroll-reveal-text">
+          <h2 class="section-title scroll-reveal reveal-wipe">
             Things I've Worked With
           </h2>
           <p class="plates-mobile-tip scroll-reveal scroll-reveal-text">
@@ -3167,6 +3272,7 @@
       </section>
 
       <section id="contact" class="section-block contact-section">
+        <span class="light-sweep" aria-hidden="true"></span>
         <img
           class="orn orn-cathedral"
           src="/chin-portfolio/engraved/cathedral.webp"
@@ -3184,9 +3290,9 @@
           loading="lazy"
         />
         <div class="section-head">
-          <div class="rule short" aria-hidden="true"></div>
-          <span class="section-kicker">Communication</span>
-          <h2 class="section-title">Get in Touch</h2>
+          <div class="rule short scroll-reveal reveal-wipe" aria-hidden="true"></div>
+          <span class="section-kicker scroll-reveal reveal-wipe">Communication</span>
+          <h2 class="section-title scroll-reveal reveal-wipe">Get in Touch</h2>
         </div>
         <p class="contact-note">
           Available for full-stack development, AI engineering roles, and
@@ -3304,13 +3410,13 @@
 
         <!-- Accessible / mobile fallback list — shown on mobile, hidden on desktop -->
         <ul class="contact-list">
-          <li>
+          <li class="scroll-reveal">
             <a href="mailto:jizdanyr354@gmail.com" class="contact-row">
               <span class="contact-ch">Email</span>
               <span class="contact-cv">jizdanyr354@gmail.com</span>
             </a>
           </li>
-          <li>
+          <li class="scroll-reveal">
             <a
               href="https://www.tiktok.com/@jizdanyr"
               target="_blank"
@@ -3321,7 +3427,7 @@
               <span class="contact-cv">@jizdanyr</span>
             </a>
           </li>
-          <li>
+          <li class="scroll-reveal">
             <a
               href="https://github.com/UnnamedPeople-Chin"
               target="_blank"
@@ -3332,7 +3438,7 @@
               <span class="contact-cv">@UnnamedPeople-Chin</span>
             </a>
           </li>
-          <li>
+          <li class="scroll-reveal">
             <a
               href="https://www.instagram.com/jizdan.yr"
               target="_blank"
@@ -5465,6 +5571,14 @@
               entries.forEach((entry) => {
                 if (entry.isIntersecting) {
                   entry.target.classList.add("is-visible");
+                  /* One light sweep per section: the FIRST wipe-carrying head to
+                     arrive flips `.sweep` on its section, and every later head in
+                     that section is already too late to matter. The observer
+                     unobserves each element after firing, so this runs once. */
+                  if (entry.target.classList.contains("reveal-wipe")) {
+                    const sec = entry.target.closest(".section-block");
+                    if (sec) sec.classList.add("sweep");
+                  }
                   revealObserver.unobserve(entry.target); // trigger once
                 }
               });
@@ -6198,7 +6312,9 @@
           gsap.set(c, {
             rotation: b.rotation,
             x: b.x,
-            scale: 0,
+            y: 110, /* the fan waits just below its resting line … */
+            scale: 0.86,
+            opacity: 0,
             zIndex: b.z,
             visibility: "visible",
           });
@@ -6210,17 +6326,26 @@
         function runEntrance() {
           if (animated) return;
           animated = true;
+          /* … and rises into it, rather than popping from scale:0. `power3.out`
+             keeps the fan reading as one object lifting into place; the stagger
+             lets each card find its own angle. */
           gsap.to(cards, {
+            y: 0,
+            opacity: 1,
             scale: 1,
-            duration: 0.85,
-            stagger: 0.08,
-            ease: "elastic.out(1, 0.52)",
+            duration: 0.9,
+            stagger: 0.09,
+            ease: "power3.out",
             delay: 0.1,
             onComplete: function () {
-              entranceDone = true;
+              /* Pin y/scale to their resting values BEFORE releasing the hover
+                 handlers, so the magnetic quickTo(card, "y") in the enhancement
+                 block starts from a clean baseline instead of fighting whatever
+                 value the entrance tween left behind. */
               cards.forEach(function (c) {
-                gsap.set(c, { scale: 1 });
+                gsap.set(c, { y: 0, scale: 1 });
               });
+              entranceDone = true;
             },
           });
         }
