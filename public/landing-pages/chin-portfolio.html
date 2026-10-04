@@ -3505,15 +3505,18 @@
                   pathLength="1" style="--d:2100ms"/>
 
             <!-- the baseline rule — the site's divider, abstracted.  dry .20.
-                 Raised with the identity (see .intro-stamp): 590 → 424 keeps
-                 the block's seat formula exact, seat = 424/1280 − 9/32 = .05. -->
-            <path class="intro-draw dry-20 d-base" d="M150,424 H1130"
+                 The block's bottom DIVIDER: it sits just under the index line,
+                 clear of the glyphs. The seat (see .intro-stamp) puts the block
+                 bottom at vb 488 (seat = 488/1280 − 9/32 = .10), and the index's
+                 ink reaches that bottom edge, so the rule drops to 504 — ~10u
+                 below the block — instead of cutting through "01 / 05". -->
+            <path class="intro-draw dry-20 d-base" d="M150,504 H1130"
                   pathLength="1" style="--d:2260ms"/>
 
             <!-- the gold name rule — the one gold line; --earth at .55.
-                 Raised by the same 166u as the baseline so it still underlines
-                 the drawn name. -->
-            <path class="intro-draw dry-gold d-namerule" d="M430,334 H850"
+                 Sits the design's 90u under the name's ink, so it underlines the
+                 wordmark rather than crossing it. -->
+            <path class="intro-draw dry-gold d-namerule" d="M430,398 H850"
                   pathLength="1" style="--d:2500ms"/>
           </g>
         </svg>
