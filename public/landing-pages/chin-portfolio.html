@@ -3124,8 +3124,13 @@
         font-family:var(--font);
         opacity:0;
         transform:translateY(14px);
+        /* `translate` is the parking offset (see .np-card.np-away below). It is
+           kept apart from `transform` on purpose: the entrance animation holds
+           `transform` with fill:forwards and the hover lift rewrites it, so the
+           park/return slide must ride its own property to never fight them. */
+        translate:0 0;
         animation:np-in .7s cubic-bezier(.22,.7,.3,1) .95s forwards;
-        transition:transform .4s cubic-bezier(.22,.7,.3,1),box-shadow .4s ease,border-color .4s ease;
+        transition:transform .4s cubic-bezier(.22,.7,.3,1),translate .5s cubic-bezier(.22,.7,.3,1),box-shadow .4s ease,border-color .4s ease;
       }
       .np-card:hover,
       .np-card:focus-within{
@@ -3133,6 +3138,15 @@
         box-shadow:0 12px 30px rgba(2,5,14,.66),0 2px 6px rgba(2,5,14,.42);
         border-color:rgba(239,231,214,.32);
       }
+      /* Parked: the card rides fully out of the viewport bottom while the
+         footer's own links (Navigate / Elsewhere / Back to top) are under it,
+         so it can never sit on a control you are trying to click. The JS
+         watches the card against the footer's focusable rows and toggles this
+         class. translate (not transform) keeps it clear of the entrance
+         animation and the hover lift, and the class is inert without JS. */
+      .np-card.np-away{translate:0 calc(100% + 40px)}
+      .np-card.np-away:hover,
+      .np-card.np-away:focus-within{transform:none}
       .np-audio{display:none}
 
       /* Art: square cover plate with a vinyl disc that slides out on hover.
@@ -3391,7 +3405,7 @@
       }
 
       @media (prefers-reduced-motion:reduce){
-        .np-card{animation-duration:.01ms;animation-delay:0s}
+        .np-card{animation-duration:.01ms;animation-delay:0s;transition:none}
         .np-eq i{animation:none}
         .np-card.is-playing .np-disc{animation:none}
         .np-disc{transition:none}
@@ -7793,6 +7807,99 @@
         document.addEventListener("keydown", onFirst, true);
         document.addEventListener("touchend", onFirst, true);
         kick();
+
+        /* ── Dodge the footer ─────────────────────────────────────────
+           The card is fixed bottom-right, which puts it right on the
+           footer's own controls as the last screen scrolls in. A tap on the
+           card would otherwise eat the tap meant for "Back to top", and the
+           masthead/Elsewhere links could be hidden behind it. So while any
+           footer control shares the card's box the card parks itself just
+           below the viewport (the .np-away class), and it slides back the
+           moment the footer clears — or the moment the card itself is
+           focused, so its own buttons always stay reachable by keyboard.
+           Measured live rather than from a fixed scroll threshold, because
+           the footer's height changes a lot between breakpoints. */
+        var foot = document.querySelector(".site-foot");
+        if (foot && window.requestAnimationFrame) {
+          /* .foot-bar is included as a region (not just its links): on a
+             phone the bar's own text sits left while the card is right, so
+             no link overlaps it — but the card still lands on the bar, and
+             that is exactly the "nutupin footer" case to get out of. */
+          var rows = Array.prototype.slice.call(
+            foot.querySelectorAll(
+              ".foot-link, .foot-top, .foot-masthead a, .foot-list a, .foot-bar"
+            )
+          );
+          var away = false;
+          var poll = null;
+          var overlaps = function (a, b) {
+            return a.left < b.right && a.right > b.left &&
+                   a.top < b.bottom && a.bottom > b.top;
+          };
+          /* The overlap test uses the card's RESTING box, never its live
+             rect: parking slides the card below the viewport, so testing the
+             live rect would read "clear" the instant it parked, un-park it,
+             find the footer again, and flip back and forth. The resting box
+             is rebuilt from the card's CSS right/bottom (which the park
+             translate and the hover lift never touch), so the decision is
+             stable whatever the card is currently doing.
+             Recompute synchronously on every trigger. Scroll and resize fire
+             often enough to track a smooth scroll on their own, but focus
+             must not depend on an event: a page whose document is not the
+             focused one (backgrounded, headless, some embeds) updates
+             document.activeElement without ever dispatching focusin, and a
+             keyboard user would then be stuck with a parked, unreachable
+             card. So while the card is parked — and only then — a slow poll
+             re-checks; the moment it is focused or the footer clears, the
+             card returns and the poll stops, so an idle page costs nothing. */
+          var update = function () {
+            var hit = false;
+            /* a focused card is never hidden — its own buttons must stay
+               reachable by keyboard even while the footer is under it */
+            if (!card.contains(document.activeElement)) {
+              var cs = getComputedStyle(card);
+              var w = card.offsetWidth, h = card.offsetHeight;
+              var right = innerWidth - parseFloat(cs.right);
+              var bottom = innerHeight - parseFloat(cs.bottom);
+              var cr = { left: right - w, right: right, top: bottom - h, bottom: bottom };
+              for (var i = 0; i < rows.length; i++) {
+                var r = rows[i].getBoundingClientRect();
+                if (r.width && r.height && overlaps(cr, r)) { hit = true; break; }
+              }
+            }
+            if (hit !== away) {
+              away = hit;
+              card.classList.toggle("np-away", away);
+            }
+            if (away && !poll) poll = setInterval(update, 200);
+            else if (!away && poll) { clearInterval(poll); poll = null; }
+          };
+          /* Each wake recomputes at once, then a few more times on plain
+             timers: the synchronous pass makes the flip immediate, and the
+             timer passes ride out a smooth scroll that keeps moving after
+             the event that woke us. Never requestAnimationFrame — a
+             backgrounded or headless page may not run it. `update` only
+             touches the DOM when the state actually flips. */
+          var wake = function () {
+            update();
+            for (var d = 1; d <= 4; d++) setTimeout(update, d * 90);
+          };
+          window.addEventListener("scroll", wake, { passive: true });
+          window.addEventListener("resize", wake, { passive: true });
+          if (window.__lenis && window.__lenis.on) window.__lenis.on("scroll", wake);
+          document.addEventListener("focusin", wake);
+          document.addEventListener("focusout", wake);
+          /* a late font load or any other reflow moves the footer without a
+             scroll, so watch its box too, and re-check once fonts settle and
+             once everything has loaded — a cold first visit then parks
+             correctly even if no scroll ever fires */
+          if (window.ResizeObserver) new ResizeObserver(wake).observe(foot);
+          if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+            document.fonts.ready.then(wake);
+          }
+          window.addEventListener("load", wake);
+          wake();
+        }
 
         /* ── Scrub bar ────────────────────────────────────────────────
            The thumb and the gold fill are driven from currentTime; the
