@@ -1043,6 +1043,12 @@
         padding-inline:calc(max(0px, (100% - 1080px) / 2) + clamp(20px, 5vw, 48px));
       }
       .plates-mobile-tip{display:none}
+      /* The tooltip (a small project label card) is hidden by request, but its
+         `display:none` lived only inside the desktop cloud block above, so on
+         phones it rendered as a bare unstyled text block beside every chip:
+         each chip stretched to a fat 95px oval, and the "organic cloud"
+         collapsed into a ragged vertical list. Hide it at every width. */
+      .plate-tooltip{display:none !important}
       @media (max-width: 640px){
         .plates-mobile-tip{
           display:block;
@@ -1053,6 +1059,118 @@
           text-align:center;
           margin:4px auto 0;
         }
+      }
+
+      /* ---- Scroll Reveal System ----
+         TOP-LEVEL on purpose. These rules were trapped inside the
+         `@media (min-width: 641px)` cloud block below (which opens at the
+         "Floating scattered tag cloud" comment and closes before the mobile
+         block), so on phones NOTHING set `opacity:0` and every `.scroll-reveal`
+         element — the section heads, the wipe masks, the brush rules, the
+         contact list — rendered fully drawn from first paint. The page-wide
+         entrance system was desktop-only. Hoisted out (the same fix already
+         applied to `.plate:focus-visible`) so it runs at every width. */
+      .js .scroll-reveal {
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+
+      /* Text elements: fade + slide up */
+      .js .scroll-reveal-text {
+        transform: translateY(30px);
+        transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                    transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+
+      /* Flower illustration: float in from right with rotation.
+         The parallax offset is carried by the INDIVIDUAL `translate` property, not
+         by `transform`. `translate` composes independently of `transform`, so this
+         reveal transition keeps exclusive ownership of `transform` and the scroll
+         handler can never fight it. That was the old bug: writing inline
+         `transform` clobbered this reveal and, because it used the absolute scroll
+         offset, drifted the flower down the page without bound. */
+      .js .scroll-reveal-bloom {
+        --bloom-y: 0px;
+        translate: 0 var(--bloom-y);
+        transform: translateX(40px) rotate(-3deg);
+        transition: opacity 1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                    transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+
+      /* Ornament plates drift up slightly as their section arrives.  The
+         revealed rule must out-specify the generic
+         `.scroll-reveal.is-visible{opacity:1}` (0,2,0) or the plate snaps to
+         full opacity and loses its dimmed value — and it must re-assert
+         `transform`, since `.js .orn.scroll-reveal-orn` (0,3,0) would
+         otherwise pin the plate at its resting offset forever. */
+      .js .orn.scroll-reveal-orn {
+        transform: translateY(26px);
+        transition: opacity 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                    transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+      .orn.scroll-reveal-orn.is-visible {
+        opacity: var(--o, .18); transform: none;
+      }
+
+      /* Brush strokes: scale from center */
+      .js .scroll-reveal-rule {
+        transform: scaleX(0);
+        transform-origin: center;
+        transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                    transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+
+      /* Revealed state */
+      .scroll-reveal.is-visible {
+        opacity: 1;
+        transform: translateY(0) translateX(0) rotate(0) scaleX(1);
+      }
+
+      /* ---- Masked reveal ----
+         A section head (and its brush rule) is unveiled by a moving mask edge —
+         100deg, so it sweeps up-and-right — instead of a flat fade. --wipe is a
+         registered <percentage>, so the browser interpolates it; the mask's hard
+         stop rides from -30% (the whole box is transparent) to 130% (the whole
+         box is opaque), and the 30% soft edge is the wipe's leading feather.
+         If @property is unsupported the value does not interpolate but still
+         substitutes, so .is-visible flips it straight to 130% and the element is
+         fully visible — never stuck hidden. The element keeps `.scroll-reveal`,
+         so the existing observer, the per-section stagger and the reduced-motion
+         / no-JS guards all still apply. */
+      .js .scroll-reveal.reveal-wipe{
+        --wipe:-30%;
+        -webkit-mask-image:linear-gradient(100deg,#000 calc(var(--wipe) - 30%),transparent var(--wipe));
+                mask-image:linear-gradient(100deg,#000 calc(var(--wipe) - 30%),transparent var(--wipe));
+        transition:--wipe .9s cubic-bezier(.4,0,.2,1),
+                   opacity .8s cubic-bezier(.25,.46,.45,.94),
+                   transform .8s cubic-bezier(.25,.46,.45,.94);
+      }
+      .js .scroll-reveal.reveal-wipe.is-visible{ --wipe:130%; }
+
+      /* ---- Scroll Progress Brush Stroke ----
+         Also hoisted: it lived in the same desktop-only block, so on phones the
+         wrapper computed `position:static` and 0px tall while the scroll handler
+         still ran `scaleX` on the invisible fill every frame. */
+      .scroll-progress-brush {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: rgba(239, 231, 214, 0.07);
+        z-index: 10000;
+        pointer-events: none;
+      }
+      .scroll-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg,
+          rgba(198, 160, 83, 0.4) 0%,
+          rgba(198, 160, 83, 0.6) 50%,
+          rgba(198, 160, 83, 0.4) 100%
+        );
+        transform-origin: left;
+        transform: scaleX(0);
+        will-change: transform;
       }
 
       /* ---- Floating scattered tag cloud (Shopify Editions Winter '26 style) ---- */
@@ -1177,109 +1295,6 @@
           position: absolute;
           pointer-events: none;
           will-change: transform, opacity;
-        }
-
-        /* ---- Scroll Reveal System ----
-           Hidden only when JS is available to reveal it again. Without `.js` these
-           stay fully visible, so a no-JS visitor reads the whole page. */
-        .js .scroll-reveal {
-          opacity: 0;
-          will-change: transform, opacity;
-        }
-
-        /* Text elements: fade + slide up */
-        .js .scroll-reveal-text {
-          transform: translateY(30px);
-          transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                      transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        /* Flower illustration: float in from right with rotation.
-           The parallax offset is carried by the INDIVIDUAL `translate` property, not
-           by `transform`. `translate` composes independently of `transform`, so this
-           reveal transition keeps exclusive ownership of `transform` and the scroll
-           handler can never fight it. That was the old bug: writing inline
-           `transform` clobbered this reveal and, because it used the absolute scroll
-           offset, drifted the flower down the page without bound. */
-        .js .scroll-reveal-bloom {
-          --bloom-y: 0px;
-          translate: 0 var(--bloom-y);
-          transform: translateX(40px) rotate(-3deg);
-          transition: opacity 1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                      transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        /* Ornament plates drift up slightly as their section arrives.  The
-           revealed rule must out-specify the generic
-           `.scroll-reveal.is-visible{opacity:1}` (0,2,0) or the plate snaps to
-           full opacity and loses its dimmed value — and it must re-assert
-           `transform`, since `.js .orn.scroll-reveal-orn` (0,3,0) would
-           otherwise pin the plate at its resting offset forever. */
-        .js .orn.scroll-reveal-orn {
-          transform: translateY(26px);
-          transition: opacity 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                      transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-        .orn.scroll-reveal-orn.is-visible {
-          opacity: var(--o, .18); transform: none;
-        }
-
-        /* Brush strokes: scale from center */
-        .js .scroll-reveal-rule {
-          transform: scaleX(0);
-          transform-origin: center;
-          transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                      transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        /* Revealed state */
-        .scroll-reveal.is-visible {
-          opacity: 1;
-          transform: translateY(0) translateX(0) rotate(0) scaleX(1);
-        }
-
-        /* ---- Masked reveal ----
-           A section head (and its brush rule) is unveiled by a moving mask edge —
-           100deg, so it sweeps up-and-right — instead of a flat fade. --wipe is a
-           registered <percentage>, so the browser interpolates it; the mask's hard
-           stop rides from -30% (the whole box is transparent) to 130% (the whole
-           box is opaque), and the 30% soft edge is the wipe's leading feather.
-           If @property is unsupported the value does not interpolate but still
-           substitutes, so .is-visible flips it straight to 130% and the element is
-           fully visible — never stuck hidden. The element keeps `.scroll-reveal`,
-           so the existing observer, the per-section stagger and the reduced-motion
-           / no-JS guards all still apply. */
-        .js .scroll-reveal.reveal-wipe{
-          --wipe:-30%;
-          -webkit-mask-image:linear-gradient(100deg,#000 calc(var(--wipe) - 30%),transparent var(--wipe));
-                  mask-image:linear-gradient(100deg,#000 calc(var(--wipe) - 30%),transparent var(--wipe));
-          transition:--wipe .9s cubic-bezier(.4,0,.2,1),
-                     opacity .8s cubic-bezier(.25,.46,.45,.94),
-                     transform .8s cubic-bezier(.25,.46,.45,.94);
-        }
-        .js .scroll-reveal.reveal-wipe.is-visible{ --wipe:130%; }
-
-        /* ---- Scroll Progress Brush Stroke ---- */
-        .scroll-progress-brush {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 6px;
-          background: rgba(239, 231, 214, 0.07);
-          z-index: 10000;
-          pointer-events: none;
-        }
-        .scroll-progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg,
-            rgba(198, 160, 83, 0.4) 0%,
-            rgba(198, 160, 83, 0.6) 50%,
-            rgba(198, 160, 83, 0.4) 100%
-          );
-          transform-origin: left;
-          transform: scaleX(0);
-          will-change: transform;
         }
 
         /* ---- Parallax Ready Elements ---- */
@@ -1450,7 +1465,7 @@
           flex-wrap: wrap;
           justify-content: center;
           align-items: center;
-          gap: 9px 8px;
+          gap: 14px 8px;
           padding: 10px 8px 24px;
           list-style: none;
           margin: 0 auto;
@@ -1459,18 +1474,35 @@
         }
         .plate-cloud-item {
           position: static !important;
-          transform: none !important;
+          /* NO `transform: none` here. The mobile entrance (runEntrance) rises
+             each item from y:16 with GSAP, which writes an INLINE transform;
+             an `!important` none would outrank it and kill the slide, leaving
+             only a flat fade. Nothing sets a transform on this element below
+             641px — the desktop block's translate(-50%,-50%) is scoped to
+             min-width:641px — so there is nothing to neutralise. */
           display: inline-flex;
           margin: 0;
         }
         .plate-float-wrap {
           display: inline-flex;
-          transform: none !important;
+          /* The gentle per-chip vertical nudge (--nudge, set per item in JS)
+             rides `translate` — the inner wrapper, which GSAP never touches on
+             mobile — so the wrapped rows read as a hand-placed pile instead of
+             a ruled grid. `transform:none !important` was dropped: dead below
+             641px (idle float and parallax both early-return on mobile, and the
+             proximity lens only writes custom properties). */
+          translate: 0 var(--nudge, 0px);
         }
         .plate {
           display: inline-flex;
-          align-items: baseline;
+          align-items: center;
+          justify-content: center;
           gap: 3px;
+          /* 44px minimum touch target. The desktop rule sets this inside the
+             min-width block, so phones never got it and the chips sat at ~34px
+             — under the tap-target floor on the surface that IS the project
+             navigation on mobile. */
+          min-height: 44px;
           padding: 8px 15px;
           border-radius: 999px;
           border: 1px solid rgba(239, 231, 214, 0.18);
@@ -1483,6 +1515,12 @@
           transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
           white-space: nowrap;
           outline: none;
+          /* Each chip keeps the small tilt JS already computed for it (--rot),
+             so the wrapped cloud reads as a scattered, hand-placed pile rather
+             than a neat row of level pills. The desktop block applies this to
+             `.plate`; the mobile block never did, which is why the phone cloud
+             looked flat. */
+          transform: rotate(var(--rot, 0deg));
         }
         /* No hover on touch: the press is the highlight. Keyboard focus still
            gets its ring from the global .plate:focus-visible outline below. */
@@ -1490,7 +1528,7 @@
           background: #222C4E;
           border-color: var(--accent, var(--earth));
           box-shadow: 0 4px 14px rgba(2, 5, 14, 0.5);
-          transform: scale(0.96);
+          transform: rotate(var(--rot, 0deg)) scale(0.96);
         }
         .plate-tag {
           font-family: var(--font);
@@ -5937,6 +5975,13 @@
           li.style.setProperty("--x", pos.x + "%");
           li.style.setProperty("--y", pos.y + "%");
           li.style.setProperty("--rot", pos.rot + "deg");
+          /* A small, deterministic per-chip vertical nudge (±4px), applied on
+             mobile via `translate` on the float-wrap. It breaks the wrapped
+             rows out of a level grid so the cloud reads as a hand-placed pile,
+             the phone echo of the desktop scatter. Kept out of the transform
+             so it never fights the entrance tween, and kept under half the row
+             gap so two chips can never touch. */
+          li.style.setProperty("--nudge", ((i % 3) - 1) * 4 + "px");
           li.setAttribute("data-side", pos.side);
           li.setAttribute("data-project-index", String(pIdx));
           /* Each chip wears its own project's accent, so hovering it tints to
@@ -6156,11 +6201,23 @@
 
         function marks() {
           const cur = turn ? turn.to : idx;
+          /* aria-current identifies ONE current item in a set. Several tags map
+             to the same spread (two carry projectIndex 0, three each carry 1
+             and 2), so marking every match left a screen reader with two or
+             three buttons announced as "current" at once — a contradiction
+             that conveys nothing. Mark only the first match and strip the
+             attribute from the rest, so the state stays unambiguous. */
+          let marked = false;
           plateList.querySelectorAll(".plate-cloud-item").forEach((li) => {
             const pIdx = parseInt(li.getAttribute("data-project-index"), 10);
             const b = li.querySelector(".plate");
-            if (b)
-              b.setAttribute("aria-current", pIdx === cur ? "true" : "false");
+            if (!b) return;
+            if (!marked && pIdx === cur) {
+              b.setAttribute("aria-current", "true");
+              marked = true;
+            } else {
+              b.removeAttribute("aria-current");
+            }
           });
         }
 
