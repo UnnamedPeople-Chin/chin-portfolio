@@ -4,9 +4,10 @@
 // but corrected where the verify pass proved the spec's own code wrong or
 // unmeasurable. Three classes of correction, each recorded at its check:
 //
-//   · numbers the spec miscounted — A2 is 19 drawables + 2 clean strikes, not
-//     21; A6's strike ENDS at settled identity (the spec sampled mid-flight);
-//     A7's concurrency budget is <=6, not <=4 (all 19 drawables animate).
+//   · numbers the spec miscounted — A2 is 11 drawables and no strikes (the
+//     loupe/arcs/drop/crosshair/strike pair were later removed as visual noise);
+//     A6 checks the final rules settle (the strike is gone); A7's concurrency
+//     budget is <=6.
 //   · timing power restored. Headless Chrome's CSS-animation clock lags wall
 //     clock by ~700ms at startup, so the spec's fixed t0+N samples of CSS
 //     progress are unreliable, and an unbounded poll loses the timing entirely.
@@ -348,20 +349,21 @@ try {
     'frame draw starts at 220ms',
   );
 
-  // A2 (corrected): the figure is 19 drawables (every one pathLength="1") plus
-  // the 2 strike circles (fill/stroke only, no pathLength, no inline style).
-  // The spec's "21 drawables" miscounted the strike pair as drawables.
+  // A2 (corrected again): the figure is now 11 drawables (every one
+  // pathLength="1") and NO strike circles — the loupe, its four quadrant arcs,
+  // the centre crosshair, the gutter drop and the strike + glow ring were
+  // removed (they read as distracting circles over the identity). The spec's
+  // original "21 drawables" was already a miscount of the strike pair.
   check(
     'A2',
     await s.eval(`(() => {
       const d = [...document.querySelectorAll('.intro-draw')];
       const k = [...document.querySelectorAll('.intro-strike')];
-      return d.length === 19 &&
+      return d.length === 11 &&
         d.every(el => el.getAttribute('pathLength') === '1') &&
-        k.length === 2 && k.every(el =>
-          !el.hasAttribute('pathLength') && !el.getAttribute('style'));
+        k.length === 0;
     })()`),
-    '19 drawables (pathLength=1) + 2 clean strikes [corrected from 21]',
+    '11 drawables (pathLength=1), no strikes [was 19 + 2 strikes]',
   );
 
   // A3: the frame finishes drawing BEFORE the namerule starts — and, critically,
@@ -429,20 +431,21 @@ try {
   );
   const a4 = await s.eval(`(() => {
     const g = document.querySelector('.intro-ornament');
-    const loupe = g && g.querySelector('.d-loupe');
-    // The group .intro-ornament has no CSS rule anywhere, so its own computed
-    // opacity is a constant 1 and proves nothing. Measure a real ornament child:
-    // its draw offset (is it actually drawn?) and its effective opacity walked up
-    // the ancestor chain (is it actually visible?).
-    let op = 1, el = loupe;
+    // The loupe is gone; measure a surviving ornament child instead. The frame
+    // is the plate mark itself — its draw offset (is it actually drawn?) and its
+    // effective opacity walked up the ancestor chain (is it actually visible?).
+    // (The group .intro-ornament has no CSS rule, so its own computed opacity is
+    // a constant 1 and would prove nothing.)
+    const mark = g && g.querySelector('.d-frame');
+    let op = 1, el = mark;
     while (el && el !== document.documentElement) {
       op *= parseFloat(getComputedStyle(el).opacity);
       el = el.parentElement;
     }
     return {
       sc: parseFloat(getComputedStyle(document.querySelector('.intro-scaffold')).opacity),
-      loupe: loupe ? parseFloat(getComputedStyle(loupe).strokeDashoffset) : -1,
-      loupeW: loupe ? Math.round(loupe.getBoundingClientRect().width) : 0,
+      mark: mark ? parseFloat(getComputedStyle(mark).strokeDashoffset) : -1,
+      markW: mark ? Math.round(mark.getBoundingClientRect().width) : 0,
       orOp: op,
       nr: getComputedStyle(document.querySelector('.d-namerule')).stroke,
     };
@@ -453,11 +456,11 @@ try {
       a4sched.end <= 3300 &&
       !!scaffoldGone &&
       a4.sc <= 0.02 &&
-      a4.loupe <= 0.01 &&
-      a4.loupeW > 0 &&
+      a4.mark <= 0.01 &&
+      a4.markW > 0 &&
       a4.orOp > 0.5 &&
       a4.nr === 'rgb(198, 160, 83)',
-    `scaffold dissolves by ${a4sched.end}ms <= 3300; live scaffold ${a4.sc}, ornament loupe drawn (offset ${a4.loupe}, ${a4.loupeW}px wide, opacity ${a4.orOp.toFixed(2)}), gold ${a4.nr}`,
+    `scaffold dissolves by ${a4sched.end}ms <= 3300; live scaffold ${a4.sc}, ornament frame drawn (offset ${a4.mark}, ${a4.markW}px wide, opacity ${a4.orOp.toFixed(2)}), gold ${a4.nr}`,
   );
 
   // A5: Continue resolves at t0 + 3400 ± 250. The stamp is written at the exact
@@ -471,38 +474,46 @@ try {
   const dt5 = resolveT ? resolveT - t0 : -1;
   check('A5', !!resolveT && Math.abs(dt5 - 3400) <= 250, `resolved at t0+${dt5}ms`);
 
-  // A6: the strike holds full ink and ENDS settled at scale(1). The spec sampled
-  // a fixed instant and asserted a non-identity transform, but the strike's
-  // 480ms animation (delay 2620) has finished by the resolve moment, so the
-  // settled identity is correct. Assert its declared schedule, then the live
-  // end state — the same deterministic form as A3/A4.
+  // A6 (repurposed): the strike pair is gone, so the "final ink mark settles"
+  // check now targets the last two ornament strokes — the cream baseline rule
+  // and the gold name rule. Both must finish drawing (dashoffset 0) and hold
+  // full ink by the resolve moment. Assert the declared schedule first, then the
+  // live end state — the same deterministic form as A3/A4.
   const a6sched = await s.eval(`(() => {
-    const c = getComputedStyle(document.querySelector('.d-strike'));
+    const b = getComputedStyle(document.querySelector('.d-base'));
+    const n = getComputedStyle(document.querySelector('.d-namerule'));
+    const end = (c) => (parseFloat(c.animationDelay) + parseFloat(c.animationDuration)) * 1000;
     return {
-      name: c.animationName,
-      end: Math.round((parseFloat(c.animationDelay) + parseFloat(c.animationDuration)) * 1000),
+      bName: b.animationName, nName: n.animationName,
+      end: Math.round(Math.max(end(b), end(n))),
     };
   })()`);
-  const strikeInk = await until(
+  const rulesInk = await until(
     () =>
-      s.eval(
-        `getComputedStyle(document.querySelector('.d-strike')).opacity === '1'`,
-      ),
+      s.eval(`(() => {
+        const b = document.querySelector('.d-base'), n = document.querySelector('.d-namerule');
+        return !!b && !!n &&
+          parseFloat(getComputedStyle(b).strokeDashoffset) <= 0.01 &&
+          parseFloat(getComputedStyle(n).strokeDashoffset) <= 0.01;
+      })()`),
     4000,
     24,
   );
   const a6 = await s.eval(`(() => {
-    const c = getComputedStyle(document.querySelector('.d-strike'));
-    return { op: c.opacity, t: c.transform };
+    const b = getComputedStyle(document.querySelector('.d-base'));
+    const n = getComputedStyle(document.querySelector('.d-namerule'));
+    return { bOff: b.strokeDashoffset, nOff: n.strokeDashoffset,
+             bOp: b.strokeOpacity, nOp: n.strokeOpacity };
   })()`);
   check(
     'A6',
-    a6sched.name.includes('cp-strike') &&
+    a6sched.bName.includes('cp-draw') &&
+      a6sched.nName.includes('cp-draw') &&
       a6sched.end <= 3400 &&
-      !!strikeInk &&
-      a6.op === '1' &&
-      (a6.t === 'none' || a6.t === 'matrix(1, 0, 0, 1, 0, 0)'),
-    `strike ends ${a6sched.end}ms; live ${a6.op}, ${a6.t} [ends at scale(1)]`,
+      !!rulesInk &&
+      parseFloat(a6.bOff) <= 0.01 &&
+      parseFloat(a6.nOff) <= 0.01,
+    `last rules end ${a6sched.end}ms; live base off ${a6.bOff} (o ${a6.bOp}), namerule off ${a6.nOff} (o ${a6.nOp}) [fully drawn]`,
   );
 
   // ------------------------------------------------------------- F · geometry
@@ -844,7 +855,7 @@ try {
   // The true concurrency is a property of the DECLARED SCHEDULE, not of what a
   // Node sampler happens to catch: under a starved renderer the animation clock
   // jumps, and a jump can span a drawable's whole 600/420ms window between two
-  // ~30ms polls — so a sampled `animated === 19` half FLAKES while the CSS is
+  // ~30ms polls — so a sampled `animated === 11` half FLAKES while the CSS is
   // correct. Sweep the schedule instead: read every drawable's own cp-draw
   // delay/duration and compute the exact max overlap. One live read stays, as a
   // liveness cross-check that the animations are actually attached.
@@ -892,12 +903,12 @@ try {
   );
   check(
     'A7',
-    a7.count === 19 &&
+    a7.count === 11 &&
       a7.missing === 0 &&
       a7.max >= 1 &&
       a7.max <= 6 &&
       a7live >= 1,
-    `schedule max in flight ${a7.max} (<=6) over ${a7.attached} drawables; live ${a7live} mid-draw [corrected from <=4]`,
+    `schedule max in flight ${a7.max} (<=6) over ${a7.attached} drawables; live ${a7live} mid-draw [11 drawables]`,
   );
 
   // A8: the held portrait's two beats, in order. It must (1) sit IN the fan's

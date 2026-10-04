@@ -1902,11 +1902,9 @@
                                   cubic-bezier(.72, .16, .19, .96);
         animation-fill-mode: forwards;
       }
-      /* The arcs and the corner marks draw faster, so they hold wet for the
-         same ~20ms before drying. Two durations, two fade offsets, one rule.
-         Scoped to `.is-live` as well, or the base rule's 600ms would win. */
-      .intro-stage.is-live .d-arc-tl, .intro-stage.is-live .d-arc-tr,
-      .intro-stage.is-live .d-arc-br, .intro-stage.is-live .d-arc-bl,
+      /* The corner marks draw faster, so they hold wet for the same ~20ms
+         before drying. Two durations, two fade offsets, one rule. Scoped to
+         `.is-live` as well, or the base rule's 600ms would win. */
       .intro-stage.is-live .d-mark-tl, .intro-stage.is-live .d-mark-tr,
       .intro-stage.is-live .d-mark-bl, .intro-stage.is-live .d-mark-br {
         --fade: 460ms;
@@ -1926,19 +1924,14 @@
       @keyframes cp-fade { to { stroke-opacity: var(--dry-o, .2) } }
 
       /* ---- stroke widths (viewBox units; scale .734 at the 940px box) ------
-         The frame lands at 0.92 CSS px and the loupe at 0.55 px: hairlines,
-         which is this site's own stroke language (.rule and .grid-paper are
-         both 1px). The one heavy mark is the strike. */
+         The frame lands at 0.92 CSS px: a hairline, which is this site's own
+         stroke language (.rule and .grid-paper are both 1px). */
       .d-frame    { stroke-width: 1.25 }
       .d-frame-in { stroke-width: .6 }
       .d-fold     { stroke-width: .9 }
       .d-gut-a, .d-gut-b { stroke-width: .4 }
-      .d-loupe    { stroke-width: .75 }
-      .d-arc-tl, .d-arc-tr, .d-arc-br, .d-arc-bl { stroke-width: .5 }
       .d-mark-tl, .d-mark-tr, .d-mark-bl, .d-mark-br { stroke-width: .9 }
       .d-base     { stroke-width: 1 }
-      .d-drop     { stroke-width: .6 }
-      .d-centre-a, .d-centre-b { stroke-width: .9 }
       .d-namerule { stroke-width: 1 }
 
       /* ---- the scaffolding, and the one thing that dissolves ---------------
@@ -1950,42 +1943,6 @@
         animation: cp-dissolve 500ms cubic-bezier(.72, .16, .19, .96) 2750ms forwards;
       }
       @keyframes cp-dissolve { to { opacity: 0 } }
-
-      /* ---- the strike: the one mark that never dries ----------------------
-         r=8 is 11.7 CSS px across at the 940px box, at full ink, and it
-         holds. This replaces v1's 2.4-unit dot at 32%. */
-      .d-strike {
-        fill: #EFE7D6;
-        stroke: none;
-        opacity: 0;
-        transform-box: fill-box;
-        transform-origin: center;
-      }
-      .d-strike-glow {
-        fill: none;
-        stroke: var(--earth);
-        stroke-width: 1.5;
-        opacity: 0;
-        transform-box: fill-box;
-        transform-origin: center;
-      }
-      .intro-stage.is-live .d-strike {
-        animation: cp-strike 480ms cubic-bezier(.2, .9, .3, 1) 2620ms forwards;
-      }
-      .intro-stage.is-live .d-strike-glow {
-        animation: cp-strike-glow 620ms ease-out 2620ms forwards;
-      }
-      @keyframes cp-strike {
-        0%   { transform: scale(0);   opacity: 0 }
-        42%  { transform: scale(1.6); opacity: 1 }   /* the flash */
-        75%  { transform: scale(1);   opacity: 1 }
-        100% { transform: scale(1);   opacity: 1 }   /* holds, forever */
-      }
-      @keyframes cp-strike-glow {
-        0%   { transform: scale(.4);  opacity: 0 }
-        35%  { transform: scale(1.1); opacity: .55 }
-        100% { transform: scale(1.6); opacity: 0 }
-      }
 
       /* ---- the idle drift, on CSS alone ------------------------------------
          No WAAPI, no FLIP, no per-resize keyframe rebuild: a CSS keyframe
@@ -2179,18 +2136,19 @@
       /* ---- the stamp's seat -------------------------------------------------
          Declared HERE, after the identity block above, on purpose: these two
          override the v1 rules at equal specificity, so they must be later in
-         source. The stamp's BOTTOM sits 6px under the drawn baseline (viewBox
-         y=590, which is --plate-w * .1797 below the stage's centre line), so
-         the name grows upward from the rule and can never collide with the fan
-         or with the Continue button. v1 stage-centred it and the fan fanned
-         over it.
+         source. The stamp's BOTTOM sits 6px under a baseline that was moved
+         UP from the drawn baseline (viewBox y=590) to --plate-w * .05 — the
+         drawn .1797 seat sat too low and let the name collide with the role
+         line and the Continue button. Lifting it to .05 lifts the whole block
+         (kicker / name / role / index) ~13% of the plate box while keeping it
+         anchored under the raised portrait.
 
          SEAT LOCKED: this is the identity's own position and does not move
          with the held portrait. The portrait is raised by cp-plate-raise
          alone (see .intro-stage), so the ONLY thing that travels up is the
          sketchbook. */
       .intro-stamp {
-        top: calc(50% + var(--plate-w) * .1797 + 6px);
+        top: calc(50% + var(--plate-w) * .05 + 6px);
         transform: translateY(-100%);
       }
 
@@ -2415,12 +2373,6 @@
           animation-delay:calc(var(--d,0ms) * .62), calc(var(--d,0ms) * .62 + 420ms);
         }
         .intro-stage.is-live .intro-scaffold{ animation-delay:1705ms }
-        .intro-stage.is-live .d-strike{
-          animation:cp-strike 480ms cubic-bezier(.2,.9,.3,1) 1624ms forwards;
-        }
-        .intro-stage.is-live .d-strike-glow{
-          animation:cp-strike-glow 620ms ease-out 1624ms forwards;
-        }
 
         /* --- the plates: 560 + i*70, 1000ms; last (portrait) ends 1840 --- */
         .intro-stage.is-live .intro-plate{
@@ -2485,8 +2437,6 @@
           stroke-dashoffset: 0;
         }
         .intro-scaffold { opacity: 0 }
-        .d-strike { opacity: 1; animation: none !important }
-        .d-strike-glow { display: none }
         .intro-plate { animation: none !important; opacity: 0 }
         .intro-stamp > * { animation: none !important; opacity: 1; transform: none }
         /* The drawn name: the stamp rule above reveals it; the brush must be
@@ -3508,10 +3458,11 @@
            the ruling. Its ::before is the cream plate sheet (exit only). -->
       <div class="intro-plate-draw" id="introPlateDraw">
 
-        <!-- The ruled plate: 21 elements — 19 drawables, every one
-             pathLength="1", plus the two strike circles (fill/stroke only,
-             animated on transform). --d is milliseconds and is the only
-             inline style; the dry target is the explicit class. -->
+        <!-- The ruled plate: 11 drawables, every one pathLength="1". --d is
+             milliseconds and is the only inline style; the dry target is the
+             explicit class. The loupe, its four quadrant arcs, the centre
+             crosshair, the gutter drop and the strike + glow ring were
+             removed — they read as "circles" floating over the identity. -->
         <svg class="intro-lines" id="introLines" viewBox="0 0 1280 720"
              preserveAspectRatio="xMidYMid meet" fill="none"
              stroke-linecap="round" stroke-linejoin="round"
@@ -3542,21 +3493,6 @@
             <rect class="intro-draw dry-20 d-frame-in" x="106" y="86" width="1068" height="548"
                   pathLength="1" style="--d:340ms"/>
 
-            <!-- the loupe: the site's own glass, r=190 about S=(640,360).  dry .20 -->
-            <circle class="intro-draw dry-20 d-loupe" cx="640" cy="360" r="190"
-                    pathLength="1" style="--d:820ms"/>
-
-            <!-- the same circle struck again as four 90° quadrants,
-                 stroke-width .5.  dry .12 — faintest, the redundant setting -->
-            <path class="intro-draw dry-12 d-arc-tl" d="M450,360 A190,190 0 0,1 640,170"
-                  pathLength="1" style="--d:980ms"/>
-            <path class="intro-draw dry-12 d-arc-tr" d="M640,170 A190,190 0 0,1 830,360"
-                  pathLength="1" style="--d:1140ms"/>
-            <path class="intro-draw dry-12 d-arc-br" d="M830,360 A190,190 0 0,1 640,550"
-                  pathLength="1" style="--d:1300ms"/>
-            <path class="intro-draw dry-12 d-arc-bl" d="M640,550 A190,190 0 0,1 450,360"
-                  pathLength="1" style="--d:1460ms"/>
-
             <!-- corner marks: L-brackets on the plate mark's corners. ONE
                  continuous path each, so each draws as one bracket.  dry .20 -->
             <path class="intro-draw dry-20 d-mark-tl" d="M70,70 H90 V50"
@@ -3568,29 +3504,16 @@
             <path class="intro-draw dry-20 d-mark-br" d="M1210,650 H1190 V670"
                   pathLength="1" style="--d:2100ms"/>
 
-            <!-- the baseline rule — the site's divider, abstracted.  dry .20 -->
-            <path class="intro-draw dry-20 d-base" d="M150,590 H1130"
+            <!-- the baseline rule — the site's divider, abstracted.  dry .20.
+                 Raised with the identity (see .intro-stamp): 590 → 424 keeps
+                 the block's seat formula exact, seat = 424/1280 − 9/32 = .05. -->
+            <path class="intro-draw dry-20 d-base" d="M150,424 H1130"
                   pathLength="1" style="--d:2260ms"/>
 
-            <!-- the gutter drop: baseline up to the loupe's foot.  dry .20 -->
-            <path class="intro-draw dry-20 d-drop" d="M640,590 V550"
-                  pathLength="1" style="--d:2380ms"/>
-
-            <!-- the crosshair on S: TWO paths, SAME delay, so the cross
-                 appears as a cross rather than two sequential strokes.  dry .32 -->
-            <path class="intro-draw dry-32 d-centre-a" d="M624,360 H656"
-                  pathLength="1" style="--d:2500ms"/>
-            <path class="intro-draw dry-32 d-centre-b" d="M640,344 V376"
-                  pathLength="1" style="--d:2500ms"/>
-
-            <!-- THE STRIKE — the one full-ink mark; fill only, no dash maths. -->
-            <circle class="intro-strike d-strike" cx="640" cy="360" r="8"/>
-
-            <!-- the strike's glow ring.  stroke only. -->
-            <circle class="intro-strike d-strike-glow" cx="640" cy="360" r="20"/>
-
-            <!-- the gold name rule — the one gold line; --earth at .55 -->
-            <path class="intro-draw dry-gold d-namerule" d="M430,500 H850"
+            <!-- the gold name rule — the one gold line; --earth at .55.
+                 Raised by the same 166u as the baseline so it still underlines
+                 the drawn name. -->
+            <path class="intro-draw dry-gold d-namerule" d="M430,334 H850"
                   pathLength="1" style="--d:2500ms"/>
           </g>
         </svg>
