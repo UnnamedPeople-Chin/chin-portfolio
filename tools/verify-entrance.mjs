@@ -917,10 +917,27 @@ try {
   // on the plate's arrival. The regression this locks: the portrait was raised
   // from the first frame (--y:var(--raise) inline), so the "in line" phase
   // never happened. Assert the declared schedule (deterministic) plus the live
-  // resting transform — the same form as A3/A4/A6. The live `lift` read needs
-  // the raise to have LANDED (3360), so wait on A7's own t0 first; the entrance
-  // then holds until Continue, so any later read is still the settled seat.
-  await sleep(Math.max(0, tA7 + 3400 - Date.now()));
+  // resting transform — the same form as A3/A4/A6. The live `lift` read must NOT
+  // be a single fixed sample: headless Chrome's CSS clock lags wall clock by
+  // ~700ms at startup, so a read at wall t0+3400 can land before the CSS raise
+  // (declared to land 3360) has settled — a flake, not a failure. Poll for the
+  // settled seat instead, bounded well past the 3360 landing. The entrance holds
+  // until Continue, so any later read is still the settled seat.
+  await sleep(Math.max(0, tA7 + 3360 - Date.now()));
+  const liftLive = await until(
+    async () => {
+      const v = await s.eval(`(() => {
+        const p = document.querySelector('.intro-plate--raise');
+        const i0 = document.querySelector('.intro-plate[style*="--i:0"]');
+        if (!p || !i0) return -1;
+        const pr = p.getBoundingClientRect(), r0 = i0.getBoundingClientRect();
+        return Math.round((r0.top + r0.height / 2) - (pr.top + pr.height / 2));
+      })()`);
+      return v > 100 ? v : 0;
+    },
+    4000,
+    24,
+  );
   const a8 = await s.eval(`(() => {
     const p = document.querySelector('.intro-plate--raise');
     if (!p) return { missing: true };
@@ -945,18 +962,11 @@ try {
       raiseEnd: raiseIdx >= 0 ? delays[raiseIdx] + durs[raiseIdx] : -1,
       raiseName: raiseIdx >= 0 ? names[raiseIdx] : '',
       clearEnd: ci >= 0 ? clearDelays[ci] + clearDurs[ci] : -1,
-      // Live cross-check of the SETTLED seat: the raised portrait's centre
-      // must sit clearly ABOVE its arc twin (the i=0 plate, --y:36px). The
-      // raise rotates about the centre, so it does not move the rect's
-      // centreY; only the y translate does. The check runs at t0+3400, after
-      // the raise lands (3360), so this reads the settled seat.
-      lift: (() => {
-        const i0 = document.querySelector('.intro-plate[style*="--i:0"]');
-        if (!i0) return -1;
-        const pr = p.getBoundingClientRect();
-        const r0 = i0.getBoundingClientRect();
-        return Math.round((r0.top + r0.height / 2) - (pr.top + pr.height / 2));
-      })(),
+      // Live cross-check of the SETTLED seat (polled above): the raised
+      // portrait's centre must sit clearly ABOVE its arc twin (the i=0 plate,
+      // --y:36px). The raise rotates about the centre, so only the y translate
+      // moves the rect's centreY.
+      lift: ${liftLive || -1},
     };
   })()`);
   check(

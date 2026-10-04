@@ -1777,7 +1777,7 @@
         opacity: 0;
         will-change: transform, opacity;
       }
-      .intro-stage { --pw: clamp(200px, 47%, 480px); --spread: min(120px, 9vw); }
+      .intro-stage { --pw: clamp(170px, 40%, 408px); --spread: min(120px, 9vw); }
       .intro-plate img {
         width: 100%;
         height: 100%;
@@ -1809,7 +1809,7 @@
            SHRINKS on short laptops so the top edge never clips off-screen:
            the plate box is height-capped, so the book's own height does not
            shrink with the viewport and a fixed px raise would. */
-        --raise: clamp(-250px, -24vh, -150px);
+        --raise: clamp(-250px, -26vh, -150px);
         perspective: 1400px;      /* for the exit's rotateX; see the exit block */
       }
 
@@ -2136,19 +2136,19 @@
       /* ---- the stamp's seat -------------------------------------------------
          Declared HERE, after the identity block above, on purpose: these two
          override the v1 rules at equal specificity, so they must be later in
-         source. The stamp's BOTTOM sits 6px under a baseline that was moved
-         UP from the drawn baseline (viewBox y=590) to --plate-w * .05 — the
-         drawn .1797 seat sat too low and let the name collide with the role
-         line and the Continue button. Lifting it to .05 lifts the whole block
-         (kicker / name / role / index) ~13% of the plate box while keeping it
-         anchored under the raised portrait.
+         source. The stamp's BOTTOM sits 6px under the baseline, which is
+         --plate-w * .10 below the stage's centre line — i.e. the block is
+         vertically CENTRED on the screen (its middle lands on the centre line).
+         The book above it is shrunk via --pw and raised via --raise, so the
+         centred block clears the sketchbook's lower edge instead of touching
+         it (see the seat-measure notes in the entrance section).
 
          SEAT LOCKED: this is the identity's own position and does not move
          with the held portrait. The portrait is raised by cp-plate-raise
          alone (see .intro-stage), so the ONLY thing that travels up is the
          sketchbook. */
       .intro-stamp {
-        top: calc(50% + var(--plate-w) * .05 + 6px);
+        top: calc(50% + var(--plate-w) * .10 + 6px);
         transform: translateY(-100%);
       }
 
