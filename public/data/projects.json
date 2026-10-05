@@ -22,6 +22,10 @@
       "image": "/chin-portfolio/ar-visualizer-modal.webp",
       "techStack": ["C#", "Unity", "AR Foundation", "Vuforia", "3D Modeling"],
       "tags": ["/ar-foundation", "/unity-3d", "/hologram-render"],
+      "video": {
+        "youtubeId": "DsPyzpgbho8",
+        "poster": "/chin-portfolio/starwars-ar-video-poster.webp"
+      },
       "links": {
         "github": "https://github.com/UnnamedPeople-Chin/Star-Wars-AR-Interactive-Character-Visualizer",
         "demo": ""

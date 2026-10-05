@@ -3026,6 +3026,152 @@
         outline-offset: 3px;
       }
 
+      /* ---- demo video -------------------------------------------------
+         A click-to-play facade, not an embed: the frame holds a still of the
+         video until the visitor asks for it, so opening the dialog makes no
+         third-party request at all. The iframe is created on that click and
+         removed again on close (see releaseModalVideo), which is what stops
+         the audio — display:none on a live player keeps playing. */
+      .video-frame {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        border-radius: 8px;
+        background: #000;
+        border: 1px solid rgba(239, 231, 214, 0.14);
+      }
+
+      .video-frame iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+      }
+
+      /* The whole poster is the control, so the hit area is the frame and
+         the play disc is decoration on top of it. */
+      .video-facade {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: 0;
+        background: #000;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+      }
+
+      .video-facade img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        /* The still is the video's own artwork, served from this origin. It
+           dims slightly under the disc so the gold stays legible on it. */
+        opacity: 0.9;
+        transition: opacity 0.25s ease;
+      }
+
+      .video-facade:hover img {
+        opacity: 1;
+      }
+
+      .video-play {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 68px;
+        height: 68px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(11, 17, 32, 0.72);
+        border: 1px solid rgba(239, 231, 214, 0.5);
+        color: var(--ink);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        transition:
+          transform 0.22s ease,
+          background 0.22s ease,
+          border-color 0.22s ease;
+        pointer-events: none;
+      }
+
+      .video-play svg {
+        width: 26px;
+        height: 26px;
+        margin-left: 3px; /* optical centring of the triangle */
+      }
+
+      .video-facade:hover .video-play,
+      .video-facade:focus-visible .video-play {
+        transform: translate(-50%, -50%) scale(1.08);
+        background: rgba(11, 17, 32, 0.9);
+        border-color: var(--earth);
+      }
+
+      /* The facade's ring is drawn inside the frame: an outside offset would
+         be clipped away by the frame's own overflow:hidden. */
+      .video-facade:focus-visible {
+        outline: 2px solid var(--earth);
+        outline-offset: -3px;
+      }
+
+      /* The caption sits on the poster, so it keeps the poster's contrast
+         regardless of the project's accent. It hangs at the TOP: the AR
+         reel's own still carries burned-in title text along its bottom edge,
+         and two captions stacked in the same corner read as a smear. */
+      .video-meta {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px 26px;
+        background: linear-gradient(to bottom, rgba(2, 5, 14, 0.78), transparent);
+        font-size: 13px;
+        letter-spacing: 0.02em;
+        color: var(--ink);
+        pointer-events: none;
+      }
+
+      .video-meta-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--accent-text, #DDBE78);
+        flex-shrink: 0;
+      }
+
+      .video-note {
+        margin: 10px 0 0;
+        font-size: 13.5px;
+        color: var(--ink-faint-text);
+      }
+
+      .video-note a {
+        color: var(--accent-text, #DDBE78);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .video-facade img,
+        .video-play {
+          transition: none;
+        }
+        .video-facade:hover .video-play,
+        .video-facade:focus-visible .video-play {
+          transform: translate(-50%, -50%);
+        }
+      }
+
       @media (max-width: 640px) {
         .project-modal {
           max-height: 94vh;
@@ -4469,6 +4615,23 @@
           </div>
           <div class="modal-body">
             <p class="modal-description" id="modalProjectDesc"></p>
+            <!-- Demo reel. The frame ships empty and the section stays hidden
+                 until a project actually carries a `video` object, so nothing
+                 here exists for the three projects without one. The facade
+                 (poster + play disc) is built by openProjectModal; the iframe
+                 that replaces it is built on the visitor's click and torn down
+                 again on close, which is what stops the audio. -->
+            <div class="modal-section modal-video" id="modalProjectVideo" hidden>
+              <h3>Demo Video</h3>
+              <div
+                class="video-frame"
+                id="modalVideoFrame"
+                role="group"
+                aria-label="Demo video"
+                tabindex="-1"
+              ></div>
+              <p class="video-note" id="modalVideoNote" aria-live="polite" hidden></p>
+            </div>
             <div class="modal-section">
               <h3>Tech Stack</h3>
               <div class="tech-stack" id="modalProjectTech"></div>
@@ -5452,6 +5615,26 @@
         const modalLinks = document.getElementById("modalProjectLinks");
         const modalYear = document.getElementById("modalProjectYear");
         const modalClose = document.getElementById("modalCloseBtn");
+        const modalVideo = document.getElementById("modalProjectVideo");
+        const modalVideoFrame = document.getElementById("modalVideoFrame");
+        const modalVideoNote = document.getElementById("modalVideoNote");
+
+        /* Facade copy for the AR demo reel. Kept here rather than in the data
+           files because it is presentational; the video itself travels with
+           the project (`video: {youtubeId, poster}`) so the two data copies
+           stay in sync like every other field. */
+        const AR_VIDEO = {
+          duration: "2:29",
+          watch: "https://youtu.be/DsPyzpgbho8",
+        };
+
+        /* Play glyph for the facade, drawn once — it is identical for every
+           project and does not need a request. */
+        const VIDEO_PLAY_ICON =
+          '<span class="video-play" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" fill="currentColor" focusable="false">' +
+          '<path d="M8 5.5v13l11-6.5z" />' +
+          "</svg></span>";
 
         let projectsData = {
           projects: [
@@ -5495,6 +5678,13 @@
                 "3D Modeling",
               ],
               tags: ["/ar-foundation", "/unity-3d", "/hologram-render"],
+              /* YouTube id plus a locally hosted still. The facade needs a
+                 poster before any third-party request is allowed, so the
+                 still is served from this origin like the rest of the art. */
+              video: {
+                youtubeId: "DsPyzpgbho8",
+                poster: "/chin-portfolio/starwars-ar-video-poster.webp",
+              },
               links: {
                 github:
                   "https://github.com/UnnamedPeople-Chin/Star-Wars-AR-Interactive-Character-Visualizer",
@@ -5583,6 +5773,139 @@
           document.body.style.overflow = lock ? "hidden" : "";
         }
 
+        /* The page runs a looping backsound, and the reel carries its own
+           audio, so the two must never sound together. The track is ducked
+           only when the player actually starts (opening the dialog alone
+           leaves the ambience alone) and restored on close — but only if it
+           had been playing, so a visitor who had paused it stays paused.
+           Driving the element's own play()/pause() also keeps the card's
+           play/pause UI honest, since it listens for those events. */
+        let backsoundWasPlaying = false;
+        function pauseBacksoundForVideo() {
+          const bs = document.querySelector(".np-card .np-audio");
+          if (!bs || bs.paused) return;
+          backsoundWasPlaying = true;
+          bs.pause();
+        }
+        function resumeBacksoundAfterVideo() {
+          if (!backsoundWasPlaying) return;
+          backsoundWasPlaying = false;
+          const bs = document.querySelector(".np-card .np-audio");
+          if (bs && bs.paused) {
+            const p = bs.play();
+            if (p && p.catch) p.catch(function () {});
+          }
+        }
+
+        /* ---- demo video ------------------------------------------------
+           Nothing third-party is requested until the visitor asks for it.
+           Opening the dialog paints a facade — a locally served still plus a
+           play disc — and the player iframe is created only on activation and
+           removed again on close. Removal, not hiding, is what stops the
+           audio: an iframe parked at display:none keeps playing.
+
+           The escape hatch stays visible under the player because a
+           cross-origin frame cannot be inspected: when the embed is blocked
+           (offline, a consent wall, a region that will not serve it) the
+           dialog cannot detect it, so "watch on YouTube" is the fallback that
+           always works. */
+        function releaseModalVideo() {
+          if (!modalVideoFrame) return;
+          const live = modalVideoFrame.querySelector("iframe");
+          if (live) live.remove();
+          modalVideoFrame.replaceChildren();
+          if (modalVideoNote) {
+            modalVideoNote.hidden = true;
+            modalVideoNote.textContent = "";
+          }
+        }
+
+        function startModalVideo(project, v) {
+          if (!modalVideoFrame) return;
+          /* The reel has its own soundtrack; duck the page's backsound so the
+             two never play at once. Done here, not in openProjectModal, so a
+             visitor who opens the card and never presses play keeps the
+             ambience. */
+          pauseBacksoundForVideo();
+
+          const iframe = document.createElement("iframe");
+          iframe.src =
+            "https://www.youtube-nocookie.com/embed/" +
+            encodeURIComponent(v.youtubeId) +
+            "?autoplay=1&rel=0&playsinline=1";
+          iframe.title = (project.title || "Project") + " — demo video";
+          iframe.allow =
+            "accelerometer; autoplay; clipboard-write; encrypted-media; " +
+            "gyroscope; picture-in-picture; web-share";
+          iframe.allowFullscreen = true;
+          iframe.referrerPolicy = "strict-origin-when-cross-origin";
+
+          /* Swap the facade for the player. The facade button is the element
+             that had focus, so focus is re-homed onto the frame container
+             (tabindex="-1") before the button goes away — otherwise focus
+             would fall to <body> and the Tab trap, which only wraps at the
+             first and last focusable, would let Tab walk the page behind the
+             dialog. From the container, Tab lands in the player. */
+          modalVideoFrame.replaceChildren(iframe);
+          modalVideoFrame.focus();
+
+          if (modalVideoNote) {
+            modalVideoNote.innerHTML =
+              'Trouble playing? <a href="' +
+              AR_VIDEO.watch +
+              '" target="_blank" rel="noopener noreferrer">Watch on YouTube →</a>';
+            modalVideoNote.hidden = false;
+          }
+        }
+
+        function buildModalVideo(project) {
+          if (!modalVideo || !modalVideoFrame) return;
+          releaseModalVideo();
+
+          const v = project && project.video;
+          if (!v || !v.youtubeId) {
+            modalVideo.hidden = true;
+            return;
+          }
+
+          modalVideo.hidden = false;
+
+          const facade = document.createElement("button");
+          facade.type = "button";
+          facade.className = "video-facade";
+          facade.setAttribute(
+            "aria-label",
+            "Play demo video: " +
+              (project.title || "project") +
+              " (" +
+              AR_VIDEO.duration +
+              ")",
+          );
+
+          const img = document.createElement("img");
+          img.src = v.poster || "";
+          /* Decorative: the button's own label names the control. */
+          img.alt = "";
+          img.loading = "lazy";
+          img.decoding = "async";
+          facade.appendChild(img);
+          facade.insertAdjacentHTML("beforeend", VIDEO_PLAY_ICON);
+
+          const meta = document.createElement("span");
+          meta.className = "video-meta";
+          meta.innerHTML =
+            '<span class="video-meta-dot" aria-hidden="true"></span>' +
+            "Demo reel · " +
+            AR_VIDEO.duration;
+          facade.appendChild(meta);
+
+          facade.addEventListener("click", function () {
+            startModalVideo(project, v);
+          });
+
+          modalVideoFrame.appendChild(facade);
+        }
+
         function openProjectModal(project) {
           if (!project || !modalBackdrop) return;
 
@@ -5647,6 +5970,15 @@
           const techBadges = modalBackdrop.querySelectorAll(".tech-badge");
           const links = modalBackdrop.querySelectorAll(".modal-link");
 
+          /* Build the video facade for this project, or tear the last one down
+             and hide the section. Rebuilding here (rather than on close) means
+             a project without a video can never inherit the previous
+             project's player, however the dialog was closed. Must run before
+             the facade is queried below, or the entrance tween would target a
+             node that is about to be replaced. */
+          buildModalVideo(project);
+          const videoFacade = modalBackdrop.querySelector(".video-facade");
+
           // Show backdrop immediately
           modalBackdrop.style.display = "flex";
           modalBackdrop.setAttribute("aria-hidden", "false");
@@ -5674,6 +6006,7 @@
               sectionHeadings,
               techBadges,
               links,
+              videoFacade,
               modalClose,
             ]);
 
@@ -5810,6 +6143,16 @@
                 0.2,
               );
             }
+
+            // 10. Demo video facade fades up with the rest of the card
+            if (videoFacade) {
+              tl.fromTo(
+                videoFacade,
+                { opacity: 0, y: 10 },
+                { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" },
+                0.18,
+              );
+            }
           } else {
             modalBackdrop.style.opacity = "1";
             if (modal) {
@@ -5821,6 +6164,13 @@
 
         function closeProjectModal() {
           if (!modalBackdrop) return;
+
+          /* Tear the player down first. Removing the iframe from the document
+             stops its audio immediately, before the exit tween runs — waiting
+             for onComplete would leave the reel audible over the fade. Hand
+             the ambience back afterwards, if we were the ones who took it. */
+          releaseModalVideo();
+          resumeBacksoundAfterVideo();
 
           /* The dialog tinted the accent to its own project; hand the tokens
              back to the spread that is still on screen behind it. */
@@ -6655,6 +7005,13 @@
           let liftTimer = 0;          /* +120  .is-lifting */
           let turnTimer = 0;          /* +400  .is-turn + startRiffle() */
           let closeTimer = 0;         /* +1240 dismiss(false) */
+          /* Set true by resolveIntro() once the plate sequence settles. It gates
+             BOTH the Continue button's click and the Space/Enter exit, so neither
+             can fire before there is something to continue from. Declared here on
+             purpose: the bare assignment inside resolveIntro() would otherwise
+             only create it as a sloppy-mode global, and a keypress during the
+             entrance would read an undeclared name and throw a ReferenceError. */
+          let continueReady = false;
           /* The entrance's shared state. `tl` / `backstopId` are the animation
              handles `dismiss()` must be able to kill; `closed` is set the
              moment a dismissal begins, so a late timer can tell "user already
