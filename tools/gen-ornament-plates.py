@@ -35,9 +35,12 @@ Usage:
       public/chin-portfolio/engraved/stone-alley-640.webp --width 640 \
       --lo 0.040 --hi 0.155 --mass-w 0.35 --mass-floor 0.68
 
-  # the rider keeps its own colour — only its edges are faded:
-  python tools/gen-ornament-plates.py colour _arsip-gambar/originals-plates/rider.jpg \
-      public/chin-portfolio/engraved/rider-colour-720.webp --width 720 --quality 88
+  # the rider is a full-frame painting, not line art: it needs a harder local
+  # threshold, the strongest mass term, and a sharpen pass so its own edges read
+  # as drawn lines at the page's low opacity:
+  python tools/gen-ornament-plates.py convert _arsip-gambar/originals-plates/rider.jpg \
+      public/chin-portfolio/engraved/rider-engraved-720.webp --width 720 \
+      --lo 0.020 --hi 0.100 --mass-w 1.0 --mass-floor 0.60 --sharpen 0.8
 """
 from __future__ import annotations
 
@@ -111,11 +114,23 @@ def convert(
     fade: float = 0.22,
     border: float = 0.08,
     blur: float = 1.0,
+    sharpen: float = 0.0,
+    flat: int = 0,
     quality: int = 90,
 ) -> None:
     img = Image.open(src).convert("RGB")
     if img.width != width:
         img = img.resize((width, max(1, round(img.height * width / img.width))), Image.LANCZOS)
+    # A painting (as opposed to line art) carries a lot of soft midtone texture,
+    # which the local-contrast threshold turns into grey mush. Flattening that
+    # texture first and sharpening what is left lets the subject's own edges
+    # read as drawn lines.
+    if flat:
+        img = img.filter(ImageFilter.MedianFilter(flat))
+    if sharpen:
+        img = img.filter(
+            ImageFilter.UnsharpMask(radius=2, percent=int(sharpen * 100), threshold=2)
+        )
     rgb = np.asarray(img, dtype=np.float32)
     h, w = rgb.shape[:2]
 
@@ -247,6 +262,10 @@ def main(argv: list[str]) -> int:
                    help="top/bottom alpha fade depth, as a fraction of the height")
     c.add_argument("--border", type=float, default=0.08)
     c.add_argument("--blur", type=float, default=1.0)
+    c.add_argument("--sharpen", type=float, default=0.0,
+                   help="unsharp-mask amount 0..1 (a painting's soft midtones need it)")
+    c.add_argument("--flat", type=int, default=0,
+                   help="median-filter radius to flatten texture before thresholding")
     c.add_argument("--quality", type=int, default=90)
 
     k = sub.add_parser("colour", help="keep the illustration's colour, fade only its edges")
@@ -269,7 +288,8 @@ def main(argv: list[str]) -> int:
         convert(
             args.src, args.dst, width=args.width, sigma=args.sigma, lo=args.lo, hi=args.hi,
             mass_w=args.mass_w, mass_floor=args.mass_floor, gold=args.gold, desat=args.desat,
-            lift=args.lift, fade=args.fade, border=args.border, blur=args.blur, quality=args.quality,
+            lift=args.lift, fade=args.fade, border=args.border, blur=args.blur,
+            sharpen=args.sharpen, flat=args.flat, quality=args.quality,
         )
     elif args.mode == "colour":
         colourise(
