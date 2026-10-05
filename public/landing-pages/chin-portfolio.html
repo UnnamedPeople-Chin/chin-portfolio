@@ -457,20 +457,27 @@
          Every plate is cream/gold line art on transparency, screen-blended
          onto the navy ground so it reads as engraving rather than as a
          photograph: a night colonnade, halftone ruins, a baroque dome, a
-         marble statue, a gothic spire and an archer on the left, and a
-         colonnade of Corinthian columns, a ridge rider, a stone alley and the
-         Kaaba down the right. Decorative and non-interactive; the alpha is
-         carried in the file, so each just needs a size and an opacity.
+         marble statue, a gothic spire and an archer on the left, a colonnade
+         of Corinthian columns and a stone alley down the right, and — alone,
+         in the contact corner — a ridge rider that keeps the painting's own
+         colour. Decorative and non-interactive; the alpha is carried in the
+         file, so each just needs a size and an opacity.
 
-         The rider, alley and Kaaba plates are converted from the supplied
-         colour illustrations: a local-contrast threshold keeps the subject's
-         own linework and masses while dropping the picture's global tone, the
-         RGB is then desaturated and lifted to the left set's pale cream (deep
-         ~ (218,211,195), sat ~ 11%), and the alpha is ramped to 0 across the
-         top and bottom (and every border) so a plate dissolves into the ground
-         instead of ending as a rectangular "photo box". (`sky-clouds-*.webp`
-         is the Corinthian-column plate — the file names were crossed at some
-         point.)
+         The alley is converted from a supplied colour illustration: a
+         local-contrast threshold keeps the subject's own linework and masses
+         while dropping the picture's global tone, the RGB is then desaturated
+         and lifted to the left set's pale cream (deep ~ (218,211,195), sat ~
+         11%), and the alpha is ramped to 0 across the top and bottom (and
+         every border) so a plate dissolves into the ground instead of ending
+         as a rectangular "photo box". (`sky-clouds-*.webp` is the
+         Corinthian-column plate — the file names were crossed at some point.)
+
+         The rider is the deliberate exception. The engraved conversion turned
+         its big dark horse into a beige blob, so `rider-colour-720` keeps the
+         painting's own blue (tools/gen-ornament-plates.py colour) and only
+         fades its top/bottom and borders; it is the one plate that opts out of
+         `mix-blend-mode:screen` so its colour stays true, and its own alpha
+         ramp keeps it from reading as a pasted-in photo box.
 
          Every plate states its opacity once as `--o`; the revealed state and
          the reduced-motion guard both read it, so a new plate is one rule.
@@ -491,17 +498,15 @@
         position:absolute;pointer-events:none;user-select:none;z-index:0;
         mix-blend-mode:screen;-webkit-user-drag:none;
         opacity:var(--o, .18);
-        /* Only the two plates below set an explicit height; for the rest the
-           markup's width/height attributes are the aspect-ratio source, so
-           `auto` keeps them from being read as a fixed used height (which
-           would stretch any plate whose CSS sizes it by width alone). The
-           height-setting rules below override this. */
+        /* A few plates below set an explicit height (colonnade, clouds,
+           cathedral, rider); for the rest the markup's width/height attributes
+           are the aspect-ratio source, so `auto` keeps them from being read as
+           a fixed used height (which would stretch any plate whose CSS sizes it
+           by width alone). The height-setting rules below override this. */
         height:auto;
       }
       .orn-colonnade{--o:.19;left:0;bottom:0;height:min(92%,900px);width:auto}
       .orn-clouds{--o:.16;right:0;top:0;height:min(88%,820px);width:auto}
-      .orn-kaaba{--o:.22;right:0;top:clamp(-10px,-.8vw,0px);
-        width:clamp(180px,17vw,270px)}
       .orn-ruins{--o:.17;left:clamp(-20px,0vw,20px);bottom:0;
         width:clamp(220px,30vw,460px)}
 
@@ -520,11 +525,6 @@
         width:clamp(148px,calc(45vw - 400px),252px)}
       .orn-archer{--o:.16;right:0;bottom:0;
         width:clamp(138px,12vw,186px)}
-      /* The ridge rider stacks into the same right column as the archer, above
-         it, so the about section's right edge carries two plates close
-         together instead of one. */
-      .orn-rider{--o:.17;right:0;top:clamp(0px,1vh,22px);
-        height:min(78%,720px);width:auto}
       /* plates — the baroque dome and the stone alley flank the Index of
          Craft head, one per side, so the tag cloud floats between two plates.
          The section is full-bleed (its column is held in by padding), so
@@ -533,11 +533,22 @@
         width:clamp(198px,19vw,300px)}
       .orn-alley{--o:.18;right:0;top:clamp(14px,2.5vh,40px);
         width:clamp(240px,27vw,390px)}
-      /* contact — the gothic spire climbs the left edge, answering the Kaaba
-         plate already in the top-right corner; both are full-bleed edge
-         anchors for the same reason as the plates above. */
+      /* contact — the gothic spire climbs the left edge; the ridge rider fills
+         the right corner as a big, faded colour plate, the one ornament that
+         keeps the painting's own blue rather than the engraved cream. It is
+         anchored top-right, and its own alpha ramp dissolves the sky edge into
+         the ground instead of ending on a hard line; its alpha is baked into
+         the file, so it drops the shared screen blend to stay true.
+         The width is a clamp rather than a height so the plate scales with the
+         viewport: at 1440 it is the full 360px, but between 901 and 1150 a
+         height-sized plate would widen left past the centred `.contact-note`
+         and put the note's last words on the painting's bright sky. 26vw keeps
+         its left edge right of the note's text at every width ≥901 (the plate
+         is hidden below 900 anyway). */
       .orn-cathedral{--o:.16;left:0;top:0;
         height:min(98%,676px);width:auto}
+      .orn-rider{--o:.72;right:0;top:0;mix-blend-mode:normal;
+        width:clamp(200px,26vw,360px);height:auto}
       @media (max-width:900px){.orn{display:none}}
 
       .hero-kicker{
@@ -4143,16 +4154,6 @@
           decoding="async"
           loading="lazy"
         />
-        <img
-          class="orn orn-rider"
-          src="/chin-portfolio/engraved/ridge-rider-600.webp"
-          width="600"
-          height="1200"
-          alt=""
-          aria-hidden="true"
-          decoding="async"
-          loading="lazy"
-        />
         <div class="section-head">
           <div
             class="rule scroll-reveal reveal-wipe"
@@ -4311,10 +4312,10 @@
           loading="lazy"
         />
         <img
-          class="orn orn-kaaba"
-          src="/chin-portfolio/engraved/kaaba-560.webp"
-          width="560"
-          height="995"
+          class="orn orn-rider"
+          src="/chin-portfolio/engraved/rider-colour-720.webp"
+          width="720"
+          height="1440"
           alt=""
           aria-hidden="true"
           decoding="async"

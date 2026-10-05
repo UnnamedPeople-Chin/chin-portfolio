@@ -23,18 +23,21 @@ This script avoids that with four passes:
 Modes:
 
   convert  <src> <dst> [--width N] ...    colour illustration -> engraved plate
+  colour   <src> <dst> [--width N] ...    keep the illustration's own colour,
+                                          fading only its top/bottom and borders
   feather  <path> [--feather F]           soften the borders of an existing
                                           plate in place (repairs plates whose
                                           alpha reaches 255 at the image edge)
 
 Usage:
-  python tools/gen-ornament-plates.py convert shots/user/rider.png \
-      public/chin-portfolio/engraved/ridge-rider-600.webp --width 600
-
-  # a foliage-dense scene with no strong silhouette wants a harder threshold:
-  python tools/gen-ornament-plates.py convert shots/user/alley.png \
+  # the alley is line-art-like enough for the engraved treatment:
+  python tools/gen-ornament-plates.py convert _arsip-gambar/originals-plates/alley.jpg \
       public/chin-portfolio/engraved/stone-alley-640.webp --width 640 \
       --lo 0.040 --hi 0.155 --mass-w 0.35 --mass-floor 0.68
+
+  # the rider keeps its own colour — only its edges are faded:
+  python tools/gen-ornament-plates.py colour _arsip-gambar/originals-plates/rider.jpg \
+      public/chin-portfolio/engraved/rider-colour-720.webp --width 720 --quality 88
 """
 from __future__ import annotations
 
@@ -153,6 +156,61 @@ def convert(
           f"border_a={_border_alpha(alpha):.0f}")
 
 
+def colourise(
+    src: Path,
+    dst: Path,
+    width: int = 1000,
+    fade: float = 0.20,
+    border: float = 0.07,
+    saturation: float = 1.0,
+    quality: int = 90,
+) -> None:
+    """Keep the illustration's own colour; only dissolve its rectangle.
+
+    The supplied illustrations are vivid paintings (a blue hill town), not line
+    art. Running one through `convert` throws away the very thing that makes it:
+    the colour, so a solid mass like a horse flattens into a beige blob. This
+    mode instead keeps the source RGB, masks it with the source's own alpha
+    where it has one (or the full frame where it does not), and applies the same
+    top/bottom and border fade the engraved plates use — so the picture stays
+    itself and still melts into the navy ground instead of ending on a hard
+    rectangular edge.
+
+    `saturation` is a factor (1.0 = untouched) for dialling the colour back
+    toward the page without going all the way to the engraved cream.
+    """
+    img = Image.open(src)
+    has_alpha = img.mode in ("RGBA", "LA") or "transparency" in img.info
+    img = img.convert("RGBA")
+    if img.width != width:
+        img = img.resize((width, max(1, round(img.height * width / img.width))), Image.LANCZOS)
+
+    arr = np.asarray(img, dtype=np.float32)
+    h, w = arr.shape[:2]
+    rgb, src_a = arr[:, :, :3], arr[:, :, 3]
+
+    if saturation != 1.0:
+        l = 0.2126 * rgb[:, :, 0] + 0.7152 * rgb[:, :, 1] + 0.0722 * rgb[:, :, 2]
+        rgb = l[..., None] + (rgb - l[..., None]) * saturation
+
+    if has_alpha:
+        alpha = src_a * _vfade(h, w, fade, fade) * _border_fade(h, w, border)
+    else:
+        alpha = 255.0 * _vfade(h, w, fade, fade) * _border_fade(h, w, border)
+
+    out = np.dstack([np.clip(rgb, 0, 255), alpha]).astype(np.uint8)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(out, "RGBA").save(dst, "WEBP", quality=quality, method=6, alpha_quality=95)
+
+    m = alpha > 192
+    c = rgb[m].mean(axis=0) if m.any() else rgb.reshape(-1, 3).mean(axis=0)
+    mx, mn = c.max(), c.min()
+    print(f"colour   {src.name:24s} -> {dst.name:24s} {w}x{h}  "
+          f"cov>40={(alpha > 40).mean() * 100:3.0f}%  "
+          f"mean=({c[0]:.0f},{c[1]:.0f},{c[2]:.0f}) sat={(mx - mn) / max(mx, 1) * 100:4.1f}%  "
+          f"border_a={_border_alpha(alpha):.0f}")
+
+
 def repair(path: Path, feather: float = 0.07) -> None:
     """Multiply an existing plate's alpha by a border feather, in place."""
     img = Image.open(path).convert("RGBA")
@@ -191,6 +249,17 @@ def main(argv: list[str]) -> int:
     c.add_argument("--blur", type=float, default=1.0)
     c.add_argument("--quality", type=int, default=90)
 
+    k = sub.add_parser("colour", help="keep the illustration's colour, fade only its edges")
+    k.add_argument("src", type=Path)
+    k.add_argument("dst", type=Path)
+    k.add_argument("--width", type=int, default=1000)
+    k.add_argument("--fade", type=float, default=0.20,
+                   help="top/bottom alpha fade depth, as a fraction of the height")
+    k.add_argument("--border", type=float, default=0.07)
+    k.add_argument("--saturation", type=float, default=1.0,
+                   help="1.0 keeps the source colour; lower dials it toward grey")
+    k.add_argument("--quality", type=int, default=90)
+
     f = sub.add_parser("feather", help="soften an existing plate's borders")
     f.add_argument("path", type=Path)
     f.add_argument("--feather", type=float, default=0.07)
@@ -201,6 +270,11 @@ def main(argv: list[str]) -> int:
             args.src, args.dst, width=args.width, sigma=args.sigma, lo=args.lo, hi=args.hi,
             mass_w=args.mass_w, mass_floor=args.mass_floor, gold=args.gold, desat=args.desat,
             lift=args.lift, fade=args.fade, border=args.border, blur=args.blur, quality=args.quality,
+        )
+    elif args.mode == "colour":
+        colourise(
+            args.src, args.dst, width=args.width, fade=args.fade, border=args.border,
+            saturation=args.saturation, quality=args.quality,
         )
     else:
         repair(args.path, feather=args.feather)
