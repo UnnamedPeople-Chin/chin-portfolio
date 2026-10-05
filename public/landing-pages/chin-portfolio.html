@@ -517,14 +517,21 @@
          than sitting as small vignettes. */
       /* about — the upward-looking figure stands in the empty left margin,
          level with the biography, so the section reads as a spread; the
-         archer answers it from the far right edge, clear of the bloom
-         (x1000–1260). The bio's left margin shrinks with the viewport
-         (≈43vw−395px), so the statue is sized off that same line — it stays
-         large on a desktop and never grows into the biography. */
+         archer answers it from the far right edge. Sized off the same 17vw
+         line as the bloom (~245px at 1440) rather than the old 12vw vignette,
+         so it reads as a real plate instead of a small decal — it is a
+         full-frame figure, and nothing else lives in the right margin, so the
+         larger size is safe. Its bounding box now grazes the bloom's top-right
+         corner, but only there: the bloom's own alpha is empty in that corner
+         (its flower reaches x1180+, the archer's body starts x1195), so the two
+         read as one cluster rather than overlapping art. The bio's left margin
+         shrinks with the viewport (≈43vw−395px), so the statue is sized off
+         that same line — it stays large on a desktop and never grows into the
+         biography. */
       .orn-statue{--o:.20;left:clamp(-40px,-1.8vw,0px);top:clamp(10px,2vh,34px);
         width:clamp(148px,calc(45vw - 400px),252px)}
       .orn-archer{--o:.16;right:0;bottom:0;
-        width:clamp(138px,12vw,186px)}
+        width:clamp(160px,17vw,260px)}
       /* plates — the baroque dome and the stone alley flank the Index of
          Craft head, one per side, so the tag cloud floats between two plates.
          The section is full-bleed (its column is held in by padding), so
@@ -4142,11 +4149,11 @@
         />
         <img
           class="orn orn-archer"
-          src="/chin-portfolio/engraved/archer-186.webp"
-          srcset="/chin-portfolio/engraved/archer-186.webp 186w, /chin-portfolio/engraved/archer-372.webp 372w"
-          sizes="min(186px, 12vw)"
-          width="372"
-          height="732"
+          src="/chin-portfolio/engraved/archer-372.webp"
+          srcset="/chin-portfolio/engraved/archer-186.webp 186w, /chin-portfolio/engraved/archer-372.webp 372w, /chin-portfolio/engraved/archer.webp 559w"
+          sizes="min(260px, 17vw)"
+          width="559"
+          height="1100"
           alt=""
           aria-hidden="true"
           decoding="async"
