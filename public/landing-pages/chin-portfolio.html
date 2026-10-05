@@ -3309,6 +3309,7 @@
          BACKSOUND — floating "Secret Potion" player.
          The track (audio + cover) is bundled locally as backsound.mp3 /
          backsound.webp, so the card needs no API, token or network host.
+         It plays through once by default, with an opt-in loop toggle.
          Fixed bottom-right, above the page-turn zones (z 60) and below
          the top bar (z 500).
          ============================================================ */
@@ -3502,6 +3503,16 @@
       .np-card.is-muted .np-mute .np-ic-mute{display:block}
       .np-card.is-muted .np-mute{color:var(--earth-text)}
       .np-mute:hover{background:rgba(239,231,214,.12);color:var(--ink)}
+      /* Loop toggle: off by default (the track plays once), so the resting
+         icon is the struck-through arrows — the slash says "not looping"
+         outright. Turning it on drops the slash and tints the plain arrows
+         gold, so the glyph and the colour agree instead of contradicting
+         each other. The two glyphs are swapped the same way the mute pair is. */
+      .np-loop .np-ic-loop{display:none}
+      .np-card.is-looping .np-loop .np-ic-loop{display:block}
+      .np-card.is-looping .np-loop .np-ic-once{display:none}
+      .np-card.is-looping .np-loop{color:var(--earth-text)}
+      .np-loop:hover{background:rgba(239,231,214,.12);color:var(--ink)}
       .np-play .np-ic-pause{display:none}
       .np-card.is-playing .np-play .np-ic-play{display:none}
       .np-card.is-playing .np-play .np-ic-pause{display:block}
@@ -5788,7 +5799,7 @@
           document.body.style.overflow = lock ? "hidden" : "";
         }
 
-        /* The page runs a looping backsound, and the reel carries its own
+        /* The page runs a backsound, and the reel carries its own
            audio, so the two must never sound together. The track is ducked
            only when the player actually starts (opening the dialog alone
            leaves the ambience alone) and restored on close — but only if it
@@ -8127,6 +8138,44 @@
           </svg>
         </button>
         <button
+          class="np-btn np-loop"
+          type="button"
+          aria-label="Loop backsound: off"
+          aria-pressed="false"
+        >
+          <svg
+            class="np-ic-loop"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M17 2.5 20.5 6 17 9.5" />
+            <path d="M20.5 6H7a4 4 0 0 0-4 4v.5" />
+            <path d="M7 21.5 3.5 18 7 14.5" />
+            <path d="M3.5 18H17a4 4 0 0 0 4-4v-.5" />
+          </svg>
+          <svg
+            class="np-ic-once"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M17 2.5 20.5 6 17 9.5" />
+            <path d="M20.5 6H7a4 4 0 0 0-4 4v.5" />
+            <path d="M7 21.5 3.5 18 7 14.5" />
+            <path d="M3.5 18H17a4 4 0 0 0 4-4v-.5" />
+            <path d="M4 4 20 20" />
+          </svg>
+        </button>
+        <button
           class="np-btn np-mute"
           type="button"
           aria-label="Mute backsound"
@@ -8179,13 +8228,13 @@
         class="np-audio"
         src="/chin-portfolio/backsound.mp3"
         preload="auto"
-        loop
       ></audio>
     </div>
     <script>
       /* Backsound card: a local track (no token, no API, no expiry).
-         Play/pause drives the disc spin and the equalizer; the second
-         button toggles mute; the range scrubs. The track tries to start
+         Play/pause drives the disc spin and the equalizer; the mute button
+         toggles sound; the loop button opts the track into repeat (it plays
+         once by default); the range scrubs. The track tries to start
          the moment the page opens, and falls back to the first user
          gesture (in practice the cover's Continue button) when the
          browser refuses an unmuted autoplay. */
@@ -8195,9 +8244,10 @@
         var audio = card.querySelector(".np-audio");
         var play = card.querySelector(".np-play");
         var mute = card.querySelector(".np-mute");
+        var loop = card.querySelector(".np-loop");
         var range = card.querySelector(".np-range");
         var timeEl = card.querySelector(".np-time");
-        if (!audio || !play || !mute || !range || !timeEl) return;
+        if (!audio || !play || !mute || !loop || !range || !timeEl) return;
         var setState = function (on) {
           card.classList.toggle("is-playing", on);
           play.setAttribute("aria-pressed", on ? "true" : "false");
@@ -8220,6 +8270,30 @@
         mute.addEventListener("click", function () { setMute(!audio.muted); });
         audio.addEventListener("play", function () { setState(true); });
         audio.addEventListener("pause", function () { setState(false); });
+
+        /* ── Loop toggle ───────────────────────────────────────────────
+           The track plays through ONCE by default (the <audio> carries no
+           `loop` attribute); this button turns repeat on for a visitor who
+           wants the ambience to keep going. The choice is remembered per
+           browser, so the preference survives a reload — read once at start
+           and written on every toggle. localStorage can throw (private mode,
+           blocked storage), so both ends are guarded and a throw just means
+           "no memory", which is the default-once behaviour. */
+        var LOOP_KEY = "cp-backsound-loop";
+        var setLoop = function (on) {
+          audio.loop = on;
+          card.classList.toggle("is-looping", on);
+          loop.setAttribute("aria-pressed", on ? "true" : "false");
+          loop.setAttribute("aria-label", "Loop backsound: " + (on ? "on" : "off"));
+        };
+        var storedLoop = false;
+        try { storedLoop = localStorage.getItem(LOOP_KEY) === "1"; } catch (e) { storedLoop = false; }
+        setLoop(storedLoop);
+        loop.addEventListener("click", function () {
+          var on = !audio.loop;
+          setLoop(on);
+          try { localStorage.setItem(LOOP_KEY, on ? "1" : "0"); } catch (e) {}
+        });
 
         /* ── Autoplay, with a one-shot gesture fallback ────────────────
            play() is attempted immediately. A browser that refuses an
@@ -8350,9 +8424,9 @@
         /* ── Scrub bar ────────────────────────────────────────────────
            The thumb and the gold fill are driven from currentTime; the
            duration lands with the metadata, and is re-read on every
-           durationchange because a looped track can report it late.
-           While a drag is in flight the thumb belongs to the pointer,
-           so timeupdate is not allowed to fight it. */
+           durationchange because it can arrive late. While a drag is in
+           flight the thumb belongs to the pointer, so timeupdate is not
+           allowed to fight it. */
         var dragging = false;
         var fmt = function (s) {
           if (!isFinite(s) || s < 0) s = 0;
