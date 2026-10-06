@@ -3692,8 +3692,12 @@
       .hasumi-stage{
         position:relative;
         width:min(88vw,540px);height:min(68vh,620px);
-        pointer-events:none;
+        /* The figure's own box is the one live area: it is what the visitor
+           grabs to turn her. Everything else in the overlay stays inert. */
+        pointer-events:auto;cursor:grab;touch-action:none;
+        -webkit-user-select:none;user-select:none;
       }
+      .hasumi-stage.is-dragging{cursor:grabbing}
       .hasumi-stage:before{
         content:"";position:absolute;inset:-8% -12%;z-index:0;pointer-events:none;
         background:radial-gradient(58% 46% at 50% 58%,rgba(11,17,32,.92),rgba(11,17,32,0) 72%);
@@ -3722,8 +3726,9 @@
         letter-spacing:.16em;color:var(--ink);
       }
 
-      /* The costume row. The foot ignores the pointer so the figure's own
-         space stays inert; the row turns it back on for itself. */
+      /* The costume row, and the pose row under it. The foot ignores the
+         pointer so the figure's own space stays inert; the rows turn it back
+         on for themselves. */
       .hasumi-pick{
         display:flex;flex-wrap:wrap;justify-content:center;gap:8px;
         margin-top:14px;pointer-events:auto;
@@ -3744,6 +3749,9 @@
       }
       .hasumi-pick button:focus-visible{outline:2px solid var(--earth);outline-offset:3px}
       .hasumi-pick button:disabled{cursor:default;opacity:.45}
+      /* The pose row reads as the second tier: same pill, one notch quieter. */
+      .hasumi-pick.pose{margin-top:8px}
+      .hasumi-pick.pose button{padding:7px 13px;font-size:9px;letter-spacing:.12em}
 
       .hasumi-close{
         position:absolute;top:clamp(14px,3vh,26px);right:clamp(14px,3vw,26px);z-index:3;
@@ -9009,6 +9017,28 @@
         var GOLD = 0xc6a053;
         var IDLE_CLIP = "Cafe_Idle";
 
+        /* The pose row. Every clip here was checked against all three GLBs:
+           each one exists in all three (a pose row that greys out per costume
+           is worse than a short row), and none of them carries root motion —
+           the biggest translation any of them applies to the armature is a
+           few centimetres of weight shift, so a pose can never walk the
+           figure out of its frame. `hold` marks the clips that do not loop:
+           a victory pose is an arrival, not a cycle, so it is held on its
+           last frame (LoopOnce + clampWhenFinished) and the row shows it as
+           the one that stays put until another pose or an idle is picked. */
+        var POSES = [
+          { label: "Idle", clip: "Cafe_Idle" },
+          { label: "Stand", clip: "Normal_Idle" },
+          { label: "Ready", clip: "Formation_Idle" },
+          { label: "Victory", clip: "Victory_End", hold: true },
+        ];
+        /* How long a pose change takes to blend. Short enough that the button
+           feels answered immediately, long enough that no joint snaps. */
+        var POSE_FADE = 0.45;
+        /* The slow turntable turn, in radians per second. Suspended while the
+           visitor is dragging — they are steering, not watching. */
+        var SPIN_RATE = 0.16;
+
         var state = {
           status: "idle",
           error: null,
@@ -9021,6 +9051,13 @@
           variant: 0,
           loading: false,
           loaded: [],
+          /* The pose row's: which pose is playing, and whether a pointer is
+             currently steering the figure. `spin` is the slow auto-turn —
+             true until the visitor steers, because an angle they chose is
+             theirs to keep. */
+          pose: 0,
+          dragging: false,
+          spin: true,
         };
 
         var overlay = null,
@@ -9029,12 +9066,17 @@
           noteEl = null,
           pickEl = null,
           pickBtns = [],
+          poseEl = null,
+          poseBtns = [],
           closeBtn = null,
           renderer = null,
           scene = null,
           camera = null,
           pivot = null,
           mixer = null,
+          actions = null,
+          poseAction = null,
+          drag = null,
           ro = null,
           rafId = 0,
           lastT = 0,
@@ -9280,33 +9322,34 @@
           pivot.add(root);
           modelRoot = root;
 
-          /* The idle is started here, before measuring, so the figure is
+          /* The pose is started here, before measuring, so the figure is
              framed in the pose it will hold — and so a reduced-motion visitor
-             gets a natural standing pose rather than the raw bind pose. Under
-             reduced motion the mixer is simply never advanced again. */
+             gets a natural standing pose rather than the raw bind pose. The
+             whole clip list is indexed into actions: the pose row swaps
+             between them, and a clip the visitor never picks costs nothing
+             but one action object. */
+          mixer = null;
+          actions = null;
+          poseAction = null;
           if (gltf.animations && gltf.animations.length) {
-            var clip = null;
+            mixer = new THREE.AnimationMixer(root);
+            actions = {};
             for (var i = 0; i < gltf.animations.length; i++) {
-              if (gltf.animations[i].name === IDLE_CLIP) {
-                clip = gltf.animations[i];
-                break;
-              }
-            }
-            if (!clip) {
-              for (var j = 0; j < gltf.animations.length; j++) {
-                if (/idle/i.test(gltf.animations[j].name)) {
-                  clip = gltf.animations[j];
-                  break;
-                }
-              }
-            }
-            if (clip) {
-              mixer = new THREE.AnimationMixer(root);
-              mixer.clipAction(clip).play();
-              mixer.update(0);
+              actions[gltf.animations[i].name] = mixer.clipAction(
+                gltf.animations[i],
+              );
             }
           }
           state.motion = !!mixer && motionOK();
+          if (mixer) {
+            /* A cut, not a blend: there is no outgoing figure to cross-fade
+               from, and the pose has to be on the bones before measure()
+               reads them. */
+            var want = POSES[state.pose] || POSES[0];
+            /* No draw: the camera is still the outgoing figure's until the
+               measure below, and ensureLoop() draws the finished framing. */
+            playPose(want, false, false);
+          }
 
           /* Normalise to a 1.75 m figure and sit it on the origin, then pull
              the camera back to a distance derived from the fov so the fill is
@@ -9368,8 +9411,12 @@
           if (document.hidden) return;
           if (mixer) mixer.update(dt);
           /* A slow turn only — the figure is a carving on a plinth, not a
-             character on a turntable. Still under reduced motion. */
-          if (state.motion) pivot.rotation.y += dt * 0.16;
+             character on a turntable. It stops for good the moment the
+             visitor drags: the angle they left her at is the angle they
+             meant. */
+          if (state.motion && state.spin && !state.dragging) {
+            pivot.rotation.y += dt * SPIN_RATE;
+          }
           /* The stage sits under a full-viewport backdrop-filter, and every
              repaint of the canvas makes the compositor re-rasterise that blur.
              The rotation is ~9 deg/s, so capping the draw at ~30 fps is
@@ -9388,6 +9435,12 @@
           state.status = "loading";
           state.error = null;
           state.frames = 0;
+          /* A fresh visit opens on the first costume, the first pose, and
+             with the slow turn running again. */
+          state.pose = 0;
+          state.spin = true;
+          state.dragging = false;
+          drag = null;
 
           restoreFocus = document.activeElement;
 
@@ -9400,6 +9453,14 @@
           canvas = mk("canvas", "hasumi-canvas");
           canvas.setAttribute("aria-hidden", "true");
           stage.appendChild(canvas);
+          /* The stage is the one live area of the overlay: it is what the
+             visitor grabs to turn the figure. Pointer events (not mouse) so
+             pen and touch work the same, and capture so a drag that leaves
+             the stage still tracks. */
+          stage.addEventListener("pointerdown", onDragDown);
+          stage.addEventListener("pointermove", onDragMove);
+          stage.addEventListener("pointerup", onDragUp);
+          stage.addEventListener("pointercancel", onDragUp);
           overlay.appendChild(stage);
 
           var foot = mk("div", "hasumi-foot");
@@ -9429,6 +9490,25 @@
             return b;
           });
           foot.appendChild(pickEl);
+
+          /* The pose row, under the costume row — the same button in a second
+             tier. Disabled until a figure is up, like the costume row. */
+          poseEl = mk("div", "hasumi-pick pose");
+          poseEl.setAttribute("role", "group");
+          poseEl.setAttribute("aria-label", "Pose");
+          poseBtns = POSES.map(function (p, i) {
+            var b = mk("button");
+            b.type = "button";
+            b.textContent = p.label;
+            b.disabled = true;
+            b.setAttribute("aria-pressed", i === state.pose ? "true" : "false");
+            b.onclick = function () {
+              pose(i);
+            };
+            poseEl.appendChild(b);
+            return b;
+          });
+          foot.appendChild(poseEl);
           overlay.appendChild(foot);
 
           closeBtn = mk("button", "hasumi-close");
@@ -9530,12 +9610,175 @@
           pickBtns.forEach(function (b) {
             b.disabled = !on;
           });
+          /* The pose row rides on the figure the costume row brings in, so it
+             goes dead and comes back with it — and a pose whose clip this
+             costume does not carry stays dead even then. (The four offered
+             exist in all three today; the check is what keeps that promise
+             true if the archive ever changes.) */
+          poseBtns.forEach(function (b, i) {
+            b.disabled = !on || !actions || !actions[POSES[i].clip];
+          });
         }
         function setActive(i) {
           state.variant = i;
           pickBtns.forEach(function (b, k) {
             b.setAttribute("aria-pressed", k === i ? "true" : "false");
           });
+        }
+
+        /* ---- the poses ----------------------------------------------------
+           The costume row swaps the whole figure; this row swaps the clip the
+           mixer is playing, on the figure that is already up. The clips are
+           the model's own, and the four offered exist in all three costumes.
+
+           The state that matters is `state.pose` — the visitor's choice — not
+           the action object, which belongs to whichever figure is mounted. A
+           costume change therefore lands on the same pose: mount() reads
+           state.pose and calls playPose() with the incoming figure's own
+           action for that clip. */
+
+        function setPoseActive(i) {
+          state.pose = i;
+          poseBtns.forEach(function (b, k) {
+            b.setAttribute("aria-pressed", k === i ? "true" : "false");
+          });
+        }
+
+        /* Swap the action on the live mixer.
+
+           `blend` is false in two cases: when mount() calls this (there is no
+           outgoing figure to cross-fade from, and the pose has to be on the
+           bones before measure() reads them), and under reduced motion (a
+           blend is motion; a pose change is a state change, so it cuts).
+
+           A hold clip is an arrival, not a cycle (Victory_End): it plays
+           once, clamps on its last frame and stays there — which is what the
+           row's label promises. The idle-ish clips loop.
+
+           The outgoing action fades from the weight it is actually holding,
+           not from 1: three's own fadeOut() always schedules 1 -> 0, so a
+           second press mid-blend would snap the outgoing pose up to full
+           weight before dropping it. Freezing its current weight first keeps
+           a rapid click-through smooth. */
+        function playPose(entry, blend, draw) {
+          if (!mixer || !actions || !entry) return;
+          var next = actions[entry.clip] || actions[IDLE_CLIP];
+          if (!next) return;
+          var dur = blend && state.motion ? POSE_FADE : 0;
+
+          next.reset();
+          next.setLoop(entry.hold ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
+          next.clampWhenFinished = !!entry.hold;
+          next.enabled = true;
+          next.setEffectiveTimeScale(1);
+          /* reset() clears any fading left on this action, and the weight is
+             set unconditionally so a weight frozen by an earlier fade-out
+             cannot cap this fade-in below full. */
+          next.setEffectiveWeight(1);
+          if (dur > 0) next.fadeIn(dur);
+          next.play();
+          /* Reduced motion never advances the mixer again, so a hold pose
+             that is only played would freeze on its wind-up. Land it on the
+             frame the clip is actually about. */
+          if (entry.hold && !state.motion) {
+            next.time = next.getClip().duration;
+            next.paused = true;
+          }
+
+          if (poseAction && poseAction !== next) {
+            if (dur > 0) {
+              poseAction.setEffectiveWeight(poseAction.getEffectiveWeight());
+              poseAction.fadeOut(dur);
+            } else {
+              poseAction.stop();
+            }
+          }
+          poseAction = next;
+
+          /* A fade that has run to zero leaves its action deactivated but
+             still registered with the mixer, stepping every frame for
+             nothing. Press through the row a few dozen times and that is a
+             few dozen dead actions; take them out here. */
+          for (var n in actions) {
+            var a = actions[n];
+            if (a !== next && a.isScheduled() && a.getEffectiveWeight() === 0) {
+              a.stop();
+            }
+          }
+
+          /* The first frame has to land now, not at the next rAF: mount()
+             measures right after this call, and under reduced motion (where
+             the loop never runs) this may be the only update there is. */
+          mixer.update(0);
+          if (draw !== false) drawOnce();
+        }
+
+        /* One frame, for the moments when no loop is running (reduced motion,
+           or before the first draw): a pose swap or a drag must still be
+           visible immediately. */
+        function drawOnce() {
+          if (state.motion || !renderer || !scene || !camera) return;
+          renderer.render(scene, camera);
+          state.frames++;
+        }
+
+        /* A button press on the pose row. */
+        function pose(i) {
+          if (!overlay || !modelRoot || state.loading) return;
+          var p = POSES[i];
+          if (!p || i === state.pose) return;
+          if (!actions || !actions[p.clip]) return;
+          setPoseActive(i);
+          playPose(p, true);
+        }
+
+        /* ---- turning the figure -------------------------------------------
+           The stage is the drag surface. Horizontal travel turns the pivot;
+           a full sweep of the stage is a bit under one revolution, which is
+           what a hand expects from a physical turntable.
+
+           The slow auto-turn stops the first time the visitor actually steers
+           (not merely presses): an angle they chose is theirs to keep, not
+           something that drifts away at nine degrees a second while they look
+           at it. */
+        var DRAG_RAD_PER_PX = 0.0105;
+        function onDragDown(e) {
+          if (!pivot || !overlay) return;
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+          state.dragging = true;
+          if (stage) {
+            stage.classList.add("is-dragging");
+            try {
+              stage.setPointerCapture(e.pointerId);
+            } catch (err) {}
+          }
+          if (e.cancelable) e.preventDefault();
+        }
+        function onDragMove(e) {
+          if (!drag || e.pointerId !== drag.id || !pivot) return;
+          var dx = e.clientX - drag.x;
+          if (!dx) return;
+          /* Taking hold of her — actually turning her — is what ends the
+             auto-turn. A press that never moves is not steering. */
+          drag.moved = true;
+          state.spin = false;
+          pivot.rotation.y += dx * DRAG_RAD_PER_PX;
+          drag.x = e.clientX;
+          drag.y = e.clientY;
+          /* Under reduced motion there is no loop to repaint the turn. */
+          drawOnce();
+        }
+        function onDragUp(e) {
+          if (!drag || e.pointerId !== drag.id) return;
+          drag = null;
+          state.dragging = false;
+          if (stage) {
+            stage.classList.remove("is-dragging");
+            try {
+              stage.releasePointerCapture(e.pointerId);
+            } catch (err) {}
+          }
         }
 
         /* A button press. The active costume's own button is inert; any other
@@ -9671,12 +9914,17 @@
           pivot = null;
           modelRoot = null;
           mixer = null;
+          actions = null;
+          poseAction = null;
+          drag = null;
           renderer = null;
           canvas = null;
           stage = null;
           noteEl = null;
           pickEl = null;
           pickBtns = [];
+          poseEl = null;
+          poseBtns = [];
           closeBtn = null;
           closing = false;
         }
@@ -9726,6 +9974,26 @@
           canTrigger: canTrigger,
           pick: pick,
           variants: VARIANTS,
+          pose: pose,
+          poses: POSES,
+          /* What the mixer is actually playing — name, position in the clip,
+             and whether it has clamped. Read-only; the row's own state is
+             state.pose. */
+          anim: function () {
+            if (!poseAction) return null;
+            return {
+              name: poseAction.getClip().name,
+              time: +poseAction.time.toFixed(3),
+              dur: +poseAction.getClip().duration.toFixed(3),
+              paused: poseAction.paused,
+              weight: +poseAction.getEffectiveWeight().toFixed(3),
+            };
+          },
+          /* The figure's current yaw, in radians. Read-only, and the only
+             way to see the turn from outside — the pivot is a closure. */
+          yaw: function () {
+            return pivot ? pivot.rotation.y : 0;
+          },
         };
       })();
     </script>
