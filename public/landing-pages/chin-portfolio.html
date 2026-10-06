@@ -3656,6 +3656,87 @@
       html:not(.js) .foot-inner,
       html.js-failed .foot-inner{opacity:1 !important}
 
+      /* =====================================================================
+         Easter egg — the engraved Hasumi plate
+         =====================================================================
+         Type `hasumi` on a keyboard and a full-screen plate opens with a 3D
+         model of Hasumi at its centre, rendered as an illuminated carving
+         rather than a cel-shaded sprite, so it belongs to this page's one
+         world. The ground is the project dialog's own rgba(2,5,14,.78) + blur,
+         so it reads as the same night the page is printed on.
+
+         The overlay is built in script and removed on close, so none of this
+         markup ships in the page — these rules only ever match the element the
+         script creates. Desktop only: the trigger refuses under 900px, where a
+         full-screen WebGL canvas is the wrong trade.
+         ===================================================================== */
+      .hasumi-egg{
+        position:fixed;inset:0;z-index:2200;
+        display:flex;align-items:center;justify-content:center;
+        padding:clamp(16px,4vh,44px) 16px;
+        background:rgba(2,5,14,.78);
+        -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+        opacity:0;transition:opacity .34s ease;
+        overscroll-behavior:contain;
+      }
+      .hasumi-egg.is-open{opacity:1}
+
+      /* The stage is the canvas's box and also the figure's "pool": a soft
+         navy well behind the model so it stands in light instead of floating
+         on the blurred page. The canvas is transparent, so both the pool and
+         the page's own navy read through it. */
+      .hasumi-stage{
+        position:relative;
+        width:min(88vw,540px);height:min(68vh,620px);
+        pointer-events:none;
+      }
+      .hasumi-stage:before{
+        content:"";position:absolute;inset:-8% -12%;z-index:0;pointer-events:none;
+        background:radial-gradient(58% 46% at 50% 58%,rgba(11,17,32,.92),rgba(11,17,32,0) 72%);
+      }
+      .hasumi-canvas{position:relative;z-index:1;display:block;width:100%;height:100%}
+
+      /* The name plate under the figure, and the one-line status that sits
+         above it while the library and the model are still in flight. */
+      .hasumi-foot{
+        position:absolute;left:0;right:0;bottom:clamp(14px,4.5vh,42px);
+        display:flex;flex-direction:column;align-items:center;gap:9px;
+        pointer-events:none;text-align:center;
+      }
+      .hasumi-note{
+        margin:0;font-size:10px;letter-spacing:var(--track-caps);text-transform:uppercase;
+        color:var(--ink-faint-text);
+      }
+      .hasumi-note:empty{display:none}
+      .hasumi-rule{
+        display:block;width:56px;height:1px;margin:0 auto 10px;
+        background:linear-gradient(90deg,transparent,rgba(198,160,83,.75),transparent);
+      }
+      .hasumi-name{
+        display:block;font-family:var(--display);
+        font-size:clamp(17px,2.1vw,23px);font-weight:400;
+        letter-spacing:.16em;color:var(--ink);
+      }
+
+      .hasumi-close{
+        position:absolute;top:clamp(14px,3vh,26px);right:clamp(14px,3vw,26px);z-index:3;
+        width:44px;height:44px;padding:0;
+        display:flex;align-items:center;justify-content:center;
+        background:rgba(11,17,32,.82);border:1px solid rgba(239,231,214,.2);
+        border-radius:50%;color:var(--ink);font-size:24px;line-height:1;
+        cursor:pointer;
+        -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+        transition:background .2s ease,border-color .2s ease,transform .2s ease;
+      }
+      .hasumi-close:hover{background:rgba(11,17,32,.96);border-color:var(--earth);transform:scale(1.08)}
+      .hasumi-close:focus-visible{outline:2px solid var(--earth);outline-offset:3px}
+
+      @media (max-width:900px){.hasumi-egg{display:none !important}}
+      @media (prefers-reduced-motion:reduce){
+        .hasumi-egg{transition:none}
+        .hasumi-close:hover{transform:none}
+      }
+
     </style>
   </head>
   <body>
@@ -8840,6 +8921,698 @@
         } else {
           init();
         }
+      })();
+    </script>
+
+    <script>
+      /* =====================================================================
+         Easter egg — the engraved Hasumi plate
+         =====================================================================
+         Type `hasumi` on a keyboard and a full-screen plate opens with a 3D
+         model of Hasumi at its centre, carved out of the same cream-and-gold
+         light as the rest of this page instead of being shaded like an anime
+         sprite, so it reads as one more engraving in the one night.
+
+         Deliberately free until asked for: three.js and the 4.6 MB model are
+         fetched ONLY when the word is typed, so an ordinary visit pays
+         nothing for this. On close the geometries, materials and renderer are
+         disposed, the GL context is released and the whole overlay leaves the
+         DOM — nothing is left attached.
+
+         Desktop only (the CSS hides it and the trigger refuses under 900px,
+         where a full-screen WebGL canvas is the wrong trade).
+         ===================================================================== */
+      (function () {
+        "use strict";
+        if (window.__hasumiEgg) return;
+
+        var WORD = "hasumi";
+        var THREE_URL =
+          "https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js";
+        /* 0.147.0 is the last release shipping BOTH a classic global build and
+           a classic examples/js loader, which is what lets this stay a plain
+           parser-free <script> tag with no import map — the same shape the
+           page's Lenis and GSAP already load in. Integrity matches the same
+           rule those two follow: the file is immutable and the origin sends
+           Access-Control-Allow-Origin: *, which SRI requires. */
+        var THREE_INTEGRITY =
+          "sha384-vV17nr/rMaJqmeZkFUzXLpHdQ+ME5QHKdydaqqN+3Ga39RJlNrTatJxHwGV4ml2C";
+        var LOADER_URL =
+          "https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js";
+        var LOADER_INTEGRITY =
+          "sha384-FassWWYNEPQsuRQm+59KIMcDetEc30bNyE9yfx16Ok8lvoowyH81LtrPmLWltJMh";
+        /* Pinned to a commit, not to `main`: a force-push or a rename upstream
+           can then never change what this page fetches. */
+        var GLB_URL =
+          "https://cdn.jsdelivr.net/gh/lihaohong6/BlueArchiveModels@525ae0faeb0a89f54ef4023f3be3692dcb529e51/Hasumi.glb";
+
+        var CREAM = 0xefe7d6;
+        var GOLD = 0xc6a053;
+        var IDLE_CLIP = "Cafe_Idle";
+
+        var state = {
+          status: "idle",
+          error: null,
+          meshes: 0,
+          frames: 0,
+          motion: false,
+          fit: null,
+        };
+
+        var overlay = null,
+          stage = null,
+          canvas = null,
+          noteEl = null,
+          closeBtn = null,
+          renderer = null,
+          scene = null,
+          camera = null,
+          pivot = null,
+          mixer = null,
+          ro = null,
+          rafId = 0,
+          lastT = 0,
+          closing = false,
+          restoreFocus = null,
+          onVis = null;
+
+        function mk(tag, cls) {
+          var e = document.createElement(tag);
+          if (cls) e.className = cls;
+          return e;
+        }
+        function motionOK() {
+          if (window.REDUCED) return false;
+          try {
+            return !window.matchMedia("(prefers-reduced-motion: reduce)")
+              .matches;
+          } catch (e) {
+            return true;
+          }
+        }
+        function canTrigger() {
+          try {
+            return !window.matchMedia("(max-width: 900px)").matches;
+          } catch (e) {
+            return true;
+          }
+        }
+
+        /* Same effect as the page's own lockPageScroll: Lenis drives scrolling
+           with its own wheel listener and window.scrollTo, so `overflow:hidden`
+           alone does not hold the page still behind an overlay. */
+        function lockScroll(lock) {
+          if (window.__lenis) {
+            if (lock) window.__lenis.stop();
+            else window.__lenis.start();
+          }
+          document.body.style.overflow = lock ? "hidden" : "";
+        }
+
+        /* ---- the library, fetched once and only when asked -------------- */
+        var libPromise = null;
+        function loadScript(src, integrity) {
+          return new Promise(function (resolve, reject) {
+            var s = document.createElement("script");
+            s.src = src;
+            s.async = false;
+            if (integrity) {
+              s.integrity = integrity;
+              s.crossOrigin = "anonymous";
+            }
+            s.onload = function () {
+              resolve();
+            };
+            s.onerror = function () {
+              reject(new Error("could not load " + src));
+            };
+            document.head.appendChild(s);
+          });
+        }
+        function loadLibs() {
+          if (!libPromise) {
+            libPromise = loadScript(THREE_URL, THREE_INTEGRITY)
+              .then(function () {
+                return loadScript(LOADER_URL, LOADER_INTEGRITY);
+              })
+              .catch(function (err) {
+                libPromise = null; /* a failed load may be retried */
+                throw err;
+              });
+          }
+          return libPromise;
+        }
+
+        /* ---- the engraved surface ---------------------------------------
+           The model's own materials are all replaced. A dark navy body keeps
+           the figure reading as carved stone; a fresnel term mixes cream and
+           gold along every silhouette edge, so the light appears to come from
+           the carving itself. The fragment code is appended to the standard
+           material's shader, and `customProgramCacheKey` keeps each variant in
+           its own program (a GLSL error here fails silently — the mesh simply
+           does not draw). */
+        var BODY_SHADER = [
+          /* The halo ships with zero-length normals on every vertex (230 verts,
+             all (0,0,0)) — and three.js normalizes in the vertex shader, so by
+             the time this fragment code runs, `normal` is already NaN rather
+             than zero. Every comparison with NaN is false, so a plain
+             `nlen < 0.25` test never fires and the NaN runs through the
+             lighting below, painting the plane black — darker than the page
+             behind it, which is how it announces itself. `!(nlen > 0.25)` is
+             true for NaN and for zero alike: fall back to a view-facing
+             normal, and — because the standard material's own lit colour is
+             already NaN by then — substitute the base colour outright. */
+          "vec3 nrm = normal;",
+          "float nlen = dot(nrm, nrm);",
+          "bool degen = !(nlen > 0.25);",
+          "nrm = degen ? vec3(0.0, 0.0, 1.0) : nrm * inversesqrt(nlen);",
+          "vec3 vdir = normalize(vViewPosition);",
+          "float fres = pow(1.0 - clamp(dot(nrm, vdir), 0.0, 1.0), 2.4);",
+          "float up = pow(clamp(nrm.y, 0.0, 1.0), 2.0) * 0.20;",
+          /* uFloor is the one per-mesh difference: the halo is a flat billboard
+             aimed at the camera, so its fresnel is ~0 across the whole surface
+             and it needs a luminance floor to glow at all. */
+          "float lum = clamp(max(fres * 0.95 + up, uFloor), 0.0, 1.0);",
+          "vec3 line = mix(uCream, uGold, clamp(fres * uGoldBias * 1.15 + up * 1.8, 0.0, 1.0));",
+          "vec3 base = degen ? uBase : gl_FragColor.rgb;",
+          "gl_FragColor.rgb = mix(base, line, lum);",
+        ].join("\n");
+        var U = {
+          cream: { value: null },
+          gold: { value: null },
+          goldBias: { value: 0.5 },
+          thick: { value: 0.003 },
+          floor: { value: 0.0 },
+        };
+
+        /* True when a geometry's normals are unusable — no outline hull can be
+           offset along a zero normal, so such a mesh gets no hull at all. */
+        function degenerateNormals(geo) {
+          var n = geo && geo.attributes && geo.attributes.normal;
+          if (!n || !n.count) return true;
+          for (var i = 0; i < n.count; i += 17) {
+            var x = n.getX(i),
+              y = n.getY(i),
+              z = n.getZ(i);
+            if (x * x + y * y + z * z > 0.25) return false;
+          }
+          return true;
+        }
+
+        function bodyMat(floor) {
+          var m = new THREE.MeshStandardMaterial({
+            color: 0x121a2e,
+            roughness: 0.62,
+            metalness: 0.0,
+            emissive: new THREE.Color(0x060a14),
+            emissiveIntensity: 1.0,
+            side: THREE.DoubleSide,
+          });
+          /* Each variant needs its own program, so the floor is baked into the
+             cache key rather than living only in the uniform. */
+          var tag = floor > 0 ? "lit" : "plain";
+          m.onBeforeCompile = function (sh) {
+            sh.uniforms.uCream = U.cream;
+            sh.uniforms.uGold = U.gold;
+            sh.uniforms.uGoldBias = U.goldBias;
+            sh.uniforms.uFloor = { value: floor };
+            sh.uniforms.uBase = { value: new THREE.Color(0x121a2e) };
+            sh.fragmentShader = sh.fragmentShader
+              .replace(
+                "#include <common>",
+                "#include <common>\nuniform vec3 uCream; uniform vec3 uGold; uniform float uGoldBias; uniform float uFloor; uniform vec3 uBase;",
+              )
+              .replace(
+                "#include <dithering_fragment>",
+                "#include <dithering_fragment>\n" + BODY_SHADER,
+              );
+          };
+          m.customProgramCacheKey = function () {
+            return "hasumiBody-" + tag;
+          };
+          return m;
+        }
+        /* The outline is the classic inverted hull: the same mesh drawn
+           back-faces-only and pushed a hair along its own normals, so only a
+           thin rim survives around the silhouette. */
+        function outlineMat() {
+          var m = new THREE.MeshStandardMaterial({
+            color: GOLD,
+            roughness: 0.6,
+            metalness: 0.0,
+            emissive: new THREE.Color(GOLD),
+            emissiveIntensity: 0.9,
+            side: THREE.BackSide,
+          });
+          m.onBeforeCompile = function (sh) {
+            sh.uniforms.uThick = U.thick;
+            sh.vertexShader =
+              "uniform float uThick;\n" +
+              sh.vertexShader.replace(
+                "#include <begin_vertex>",
+                "#include <begin_vertex>\ntransformed += objectNormal * uThick;",
+              );
+          };
+          m.customProgramCacheKey = function () {
+            return "hasumiOutline";
+          };
+          return m;
+        }
+
+        /* A skinned mesh's own bounding box describes its BIND pose, not the
+           pose the mixer has put it in, and the export's bind pose does not
+           even share a space with the static meshes — the body's box tops out
+           well below where the halo floats. Framing off that box leaves the
+           figure small and riding high in its frame. So measure the real
+           thing: push every skinned vertex through its bones (the same maths
+           the GPU runs), and union that with the static meshes. Runs once, on
+           open; the idle pose is applied first so it measures the figure the
+           visitor will actually see. */
+        function measure(root) {
+          var box = new THREE.Box3();
+          var v = new THREE.Vector3();
+          root.updateWorldMatrix(true, true);
+          root.traverse(function (o) {
+            /* The outline hulls share their source's geometry and skeleton, so
+               they would only re-measure the same vertices. */
+            if (!o.visible || !o.geometry || o.userData.hull) return;
+            var pos = o.geometry.attributes && o.geometry.attributes.position;
+            if (!pos) return;
+            /* r147 calls this boneTransform; later releases renamed it. It
+               reads the vertex OUT of the target it is handed, so the target
+               must be primed from the position attribute on every iteration. */
+            var skin = o.isSkinnedMesh
+              ? o.boneTransform || o.getVertexPosition
+              : null;
+            if (skin) {
+              for (var i = 0; i < pos.count; i++) {
+                v.fromBufferAttribute(pos, i);
+                skin.call(o, i, v);
+                v.applyMatrix4(o.matrixWorld);
+                box.expandByPoint(v);
+              }
+            } else {
+              if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+              box.union(
+                o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld),
+              );
+            }
+          });
+          return box;
+        }
+
+        /* ---- build ------------------------------------------------------ */
+        function build(gltf) {
+          var root = gltf.scene;
+          var meshes = [];
+
+          root.traverse(function (o) {
+            if (!o.isMesh && !o.isSkinnedMesh) return;
+            /* The export leaves the rifle detached from the rig — its bone
+               sits at x -0.96 while its geometry stays at the origin, so it
+               floats off-model. The mouth meshes are lip-sync shells that only
+               exist to be hidden by animation; both are dropped, which also
+               keeps the framing box tight. */
+            if (/Weapon/i.test(o.name)) {
+              o.visible = false;
+              return;
+            }
+            if (/^Mouth_/.test(o.name)) {
+              o.visible = false;
+              return;
+            }
+            meshes.push(o);
+          });
+
+          meshes.forEach(function (o) {
+            /* The halo is a flat billboard plane, not a solid: it needs the
+               luminance floor, the body does not. */
+            o.material = bodyMat(/Halo/i.test(o.name) ? 0.34 : 0);
+          });
+          meshes.forEach(function (o) {
+            /* A mesh whose normals are all zero cannot have an outline: the
+               hull is offset along those normals, so there would be nothing to
+               offset and the two copies would z-fight instead. The halo is the
+               one such mesh, and it is a glowing ring anyway. */
+            if (degenerateNormals(o.geometry)) return;
+            var hull = o.clone();
+            hull.material = outlineMat();
+            hull.renderOrder = -1;
+            hull.frustumCulled = false;
+            hull.userData.hull = true;
+            o.parent.add(hull);
+          });
+          state.meshes = meshes.length;
+
+          pivot.add(root);
+
+          /* The idle is started here, before measuring, so the figure is
+             framed in the pose it will hold — and so a reduced-motion visitor
+             gets a natural standing pose rather than the raw bind pose. Under
+             reduced motion the mixer is simply never advanced again. */
+          if (gltf.animations && gltf.animations.length) {
+            var clip = null;
+            for (var i = 0; i < gltf.animations.length; i++) {
+              if (gltf.animations[i].name === IDLE_CLIP) {
+                clip = gltf.animations[i];
+                break;
+              }
+            }
+            if (!clip) {
+              for (var j = 0; j < gltf.animations.length; j++) {
+                if (/idle/i.test(gltf.animations[j].name)) {
+                  clip = gltf.animations[j];
+                  break;
+                }
+              }
+            }
+            if (clip) {
+              mixer = new THREE.AnimationMixer(root);
+              mixer.clipAction(clip).play();
+              mixer.update(0);
+            }
+          }
+          state.motion = !!mixer && motionOK();
+
+          /* Normalise to a 1.75 m figure and sit it on the origin, then pull
+             the camera back to a distance derived from the fov so the fill is
+             the same whatever the stage's aspect happens to be. */
+          var box = measure(root);
+          var size = box.getSize(new THREE.Vector3());
+          var ctr = box.getCenter(new THREE.Vector3());
+          var s = 1.75 / (size.y || 1);
+          root.scale.setScalar(s);
+          root.position.set(-ctr.x * s, -ctr.y * s, -ctr.z * s);
+
+          var dist = (1.75 * 0.6) / Math.tan(((camera.fov * Math.PI) / 180) / 2);
+          camera.position.set(0, 0, dist * 1.06);
+          camera.lookAt(0, 0, 0);
+          state.fit = { h: +size.y.toFixed(3), dist: +dist.toFixed(3) };
+        }
+
+        function onResize() {
+          if (!renderer || !stage) return;
+          var w = stage.clientWidth || 1;
+          var h = stage.clientHeight || 1;
+          renderer.setSize(w, h, false);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          if (!state.motion) renderer.render(scene, camera);
+        }
+
+        function tick(t) {
+          if (!renderer) return;
+          rafId = requestAnimationFrame(tick);
+          var dt = lastT ? Math.min((t - lastT) / 1000, 0.1) : 0;
+          lastT = t;
+          /* A hidden tab gets no draws at all — the rAF may still fire, and
+             there is nothing to show for the work. */
+          if (document.hidden) return;
+          if (mixer) mixer.update(dt);
+          /* A slow turn only — the figure is a carving on a plinth, not a
+             character on a turntable. Still under reduced motion. */
+          if (state.motion) pivot.rotation.y += dt * 0.16;
+          /* The stage sits under a full-viewport backdrop-filter, and every
+             repaint of the canvas makes the compositor re-rasterise that blur.
+             The rotation is ~9 deg/s, so capping the draw at ~30 fps is
+             visually identical to an uncapped loop and halves that work. */
+          state.acc = (state.acc || 0) + dt;
+          if (state.acc < 1 / 30) return;
+          state.acc = 0;
+          renderer.render(scene, camera);
+          state.frames++;
+        }
+
+        /* ---- open / close ----------------------------------------------- */
+        function open() {
+          if (overlay || closing) return;
+          if (!canTrigger()) return;
+          state.status = "loading";
+          state.error = null;
+          state.frames = 0;
+
+          restoreFocus = document.activeElement;
+
+          overlay = mk("div", "hasumi-egg");
+          overlay.setAttribute("role", "dialog");
+          overlay.setAttribute("aria-modal", "true");
+          overlay.setAttribute("aria-label", "Hasumi");
+
+          stage = mk("div", "hasumi-stage");
+          canvas = mk("canvas", "hasumi-canvas");
+          canvas.setAttribute("aria-hidden", "true");
+          stage.appendChild(canvas);
+          overlay.appendChild(stage);
+
+          var foot = mk("div", "hasumi-foot");
+          noteEl = mk("p", "hasumi-note");
+          noteEl.textContent = "Raising the plate…";
+          var name = mk("span", "hasumi-name");
+          name.innerHTML = '<i class="hasumi-rule"></i>Hasumi';
+          foot.appendChild(noteEl);
+          foot.appendChild(name);
+          overlay.appendChild(foot);
+
+          closeBtn = mk("button", "hasumi-close");
+          closeBtn.type = "button";
+          closeBtn.setAttribute("aria-label", "Close");
+          closeBtn.innerHTML = "&times;";
+          closeBtn.onclick = close;
+          overlay.appendChild(closeBtn);
+
+          overlay.onclick = function (e) {
+            if (e.target === overlay) close();
+          };
+
+          document.body.appendChild(overlay);
+          lockScroll(true);
+          /* Let the element land in the layout before the class flips, so the
+             opacity transition actually runs instead of being coalesced. */
+          requestAnimationFrame(function () {
+            if (overlay) overlay.classList.add("is-open");
+          });
+          try {
+            closeBtn.focus({ preventScroll: true });
+          } catch (e) {
+            closeBtn.focus();
+          }
+
+          if (!window.THREE) {
+            loadLibs().then(start, fail);
+          } else {
+            start();
+          }
+        }
+
+        function start() {
+          if (!overlay) return;
+          state.status = "loading-model";
+          try {
+            renderer = new THREE.WebGLRenderer({
+              canvas: canvas,
+              antialias: true,
+              alpha: true,
+              powerPreference: "high-performance",
+            });
+          } catch (e) {
+            fail(e);
+            return;
+          }
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.outputEncoding = THREE.sRGBEncoding;
+          if (THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
+
+          scene = new THREE.Scene();
+          camera = new THREE.PerspectiveCamera(28, 1, 0.05, 100);
+          pivot = new THREE.Group();
+          scene.add(pivot);
+
+          U.cream.value = new THREE.Color(CREAM);
+          U.gold.value = new THREE.Color(GOLD);
+
+          scene.add(new THREE.AmbientLight(0x2a3555, 1.0));
+          var key = new THREE.DirectionalLight(0xefe7d6, 0.85);
+          key.position.set(-1.4, 2.2, 2.4);
+          scene.add(key);
+          var rim = new THREE.DirectionalLight(0xc6a053, 1.25);
+          rim.position.set(1.8, 0.9, -2.2);
+          scene.add(rim);
+          var under = new THREE.DirectionalLight(0x8fa6d8, 0.35);
+          under.position.set(0.4, -2.0, 0.6);
+          scene.add(under);
+
+          onResize();
+          /* Coming back from a hidden tab, the clock has jumped. Drop the
+             accumulated time so the figure does not lurch on the first frame. */
+          onVis = function () {
+            lastT = 0;
+            state.acc = 0;
+          };
+          document.addEventListener("visibilitychange", onVis);
+          if (window.ResizeObserver) {
+            ro = new ResizeObserver(onResize);
+            ro.observe(stage);
+          } else {
+            window.addEventListener("resize", onResize);
+          }
+
+          new THREE.GLTFLoader().load(
+            GLB_URL,
+            function (gltf) {
+              if (!overlay || !renderer) return; /* closed while in flight */
+              try {
+                build(gltf);
+              } catch (e) {
+                fail(e);
+                return;
+              }
+              noteEl.textContent = "";
+              state.status = "ready";
+              /* Reduced motion draws the carving once and stops: no rAF loop
+                 is left running behind a still image. */
+              if (state.motion) {
+                lastT = 0;
+                rafId = requestAnimationFrame(tick);
+              } else {
+                renderer.render(scene, camera);
+                state.frames++;
+              }
+            },
+            undefined,
+            function (err) {
+              fail(err || new Error("model failed to load"));
+            },
+          );
+        }
+
+        function fail(err) {
+          state.status = "error";
+          state.error = (err && err.message) || String(err);
+          if (noteEl) noteEl.textContent = "The plate could not be raised.";
+          if (renderer && scene && camera) {
+            try {
+              renderer.render(scene, camera);
+            } catch (e) {}
+          }
+        }
+
+        function close() {
+          if (!overlay || closing) return;
+          closing = true;
+          state.status = "closed";
+
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = 0;
+          if (ro) {
+            ro.disconnect();
+            ro = null;
+          }
+          window.removeEventListener("resize", onResize);
+          if (onVis) {
+            document.removeEventListener("visibilitychange", onVis);
+            onVis = null;
+          }
+
+          var gone = overlay;
+          overlay = null;
+          gone.classList.remove("is-open");
+          lockScroll(false);
+          if (restoreFocus && restoreFocus.focus) {
+            try {
+              restoreFocus.focus({ preventScroll: true });
+            } catch (e) {}
+          }
+          restoreFocus = null;
+          setTimeout(function () {
+            if (gone.parentNode) gone.parentNode.removeChild(gone);
+          }, 400);
+
+          /* Everything the GPU holds is released here: geometries, the
+             generated programs, the textures the loader prepared, and finally
+             the context itself. Without the context loss a browser keeps the
+             (small, but real) WebGL context alive against its per-page cap. */
+          if (scene) {
+            scene.traverse(function (o) {
+              if (o.geometry) o.geometry.dispose();
+              var mats = Array.isArray(o.material)
+                ? o.material
+                : o.material
+                  ? [o.material]
+                  : [];
+              mats.forEach(function (m) {
+                Object.keys(m).forEach(function (k) {
+                  var v = m[k];
+                  if (v && v.isTexture) v.dispose();
+                });
+                m.dispose();
+              });
+            });
+          }
+          if (renderer) {
+            renderer.dispose();
+            if (renderer.forceContextLoss) renderer.forceContextLoss();
+          }
+          if (mixer) {
+            mixer.stopAllAction();
+            if (mixer.uncacheRoot && scene) mixer.uncacheRoot(scene);
+          }
+
+          scene = null;
+          camera = null;
+          pivot = null;
+          mixer = null;
+          renderer = null;
+          canvas = null;
+          stage = null;
+          noteEl = null;
+          closeBtn = null;
+          closing = false;
+        }
+
+        /* ---- the trigger -------------------------------------------------
+           A rolling window of the last few characters typed, checked against
+           the word. Typing in a field, holding a modifier, or anything at all
+           while the entrance cover is still up is ignored, so the egg can
+           never fire from a keyboard shortcut or from someone's name. */
+        var buf = "";
+        window.addEventListener("keydown", function (e) {
+          if (overlay) {
+            if (e.key === "Escape") {
+              if (e.cancelable) e.preventDefault();
+              close();
+              return;
+            }
+            if (e.key === "Tab") {
+              e.preventDefault();
+              if (closeBtn) closeBtn.focus();
+            }
+            return;
+          }
+          if (e.ctrlKey || e.metaKey || e.altKey) return;
+          if (document.documentElement.classList.contains("intro-lock")) return;
+          var t = e.target;
+          if (
+            t &&
+            (t.tagName === "INPUT" ||
+              t.tagName === "TEXTAREA" ||
+              t.tagName === "SELECT" ||
+              t.isContentEditable)
+          )
+            return;
+          if (!e.key || e.key.length !== 1) return;
+          buf = (buf + e.key.toLowerCase()).slice(-WORD.length);
+          if (buf === WORD && canTrigger()) {
+            buf = "";
+            open();
+          }
+        });
+
+        window.__hasumiEgg = {
+          state: state,
+          open: open,
+          close: close,
+          canTrigger: canTrigger,
+        };
       })();
     </script>
   </body>
