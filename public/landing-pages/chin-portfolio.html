@@ -3660,10 +3660,14 @@
          Easter egg — the engraved Hasumi plate
          =====================================================================
          Type `hasumi` on a keyboard and a full-screen plate opens with a 3D
-         model of Hasumi at its centre, rendered as an illuminated carving
-         rather than a cel-shaded sprite, so it belongs to this page's one
-         world. The ground is the project dialog's own rgba(2,5,14,.78) + blur,
-         so it reads as the same night the page is printed on.
+         model of Hasumi at its centre — the model exactly as it was exported,
+         textures and all, standing in the page's own light. The ground is the
+         project dialog's own rgba(2,5,14,.78) + blur, so it reads as the same
+         night the page is printed on.
+
+         Three costumes ship with the model; the row under the name plate
+         swaps between them, and the file for a costume is fetched the first
+         time it is asked for, then kept for the rest of the visit.
 
          The overlay is built in script and removed on close, so none of this
          markup ships in the page — these rules only ever match the element the
@@ -3717,6 +3721,29 @@
         font-size:clamp(17px,2.1vw,23px);font-weight:400;
         letter-spacing:.16em;color:var(--ink);
       }
+
+      /* The costume row. The foot ignores the pointer so the figure's own
+         space stays inert; the row turns it back on for itself. */
+      .hasumi-pick{
+        display:flex;flex-wrap:wrap;justify-content:center;gap:8px;
+        margin-top:14px;pointer-events:auto;
+      }
+      .hasumi-pick button{
+        padding:8px 15px;
+        font-family:inherit;font-size:9.5px;font-weight:500;
+        letter-spacing:.14em;text-transform:uppercase;
+        color:var(--ink-faint-text);
+        background:rgba(11,17,32,.55);
+        border:1px solid rgba(239,231,214,.16);border-radius:999px;
+        cursor:pointer;
+        transition:color .2s ease,border-color .2s ease,background .2s ease;
+      }
+      .hasumi-pick button:hover{color:var(--ink);border-color:rgba(198,160,83,.55)}
+      .hasumi-pick button[aria-pressed="true"]{
+        color:var(--ink);background:rgba(198,160,83,.14);border-color:rgba(198,160,83,.7);
+      }
+      .hasumi-pick button:focus-visible{outline:2px solid var(--earth);outline-offset:3px}
+      .hasumi-pick button:disabled{cursor:default;opacity:.45}
 
       .hasumi-close{
         position:absolute;top:clamp(14px,3vh,26px);right:clamp(14px,3vw,26px);z-index:3;
@@ -8929,15 +8956,17 @@
          Easter egg — the engraved Hasumi plate
          =====================================================================
          Type `hasumi` on a keyboard and a full-screen plate opens with a 3D
-         model of Hasumi at its centre, carved out of the same cream-and-gold
-         light as the rest of this page instead of being shaded like an anime
-         sprite, so it reads as one more engraving in the one night.
+         model of Hasumi at its centre — shown exactly as the model ships,
+         textures and all, lit by a small studio rig so it reads as a figure
+         standing in this page's light rather than a sprite pasted onto it.
 
-         Deliberately free until asked for: three.js and the 4.6 MB model are
-         fetched ONLY when the word is typed, so an ordinary visit pays
-         nothing for this. On close the geometries, materials and renderer are
-         disposed, the GL context is released and the whole overlay leaves the
-         DOM — nothing is left attached.
+         Deliberately free until asked for: three.js and the first costume's
+         model are fetched ONLY when the word is typed, so an ordinary visit
+         pays nothing for this. The other two costumes are fetched the first
+         time their button is pressed and then cached for the visit. On close
+         the geometries, materials and renderer are disposed, the GL context is
+         released and the whole overlay leaves the DOM — nothing is left
+         attached.
 
          Desktop only (the CSS hides it and the trigger refuses under 900px,
          where a full-screen WebGL canvas is the wrong trade).
@@ -8961,12 +8990,22 @@
           "https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js";
         var LOADER_INTEGRITY =
           "sha384-FassWWYNEPQsuRQm+59KIMcDetEc30bNyE9yfx16Ok8lvoowyH81LtrPmLWltJMh";
-        /* Pinned to a commit, not to `main`: a force-push or a rename upstream
-           can then never change what this page fetches. */
-        var GLB_URL =
-          "https://cdn.jsdelivr.net/gh/lihaohong6/BlueArchiveModels@525ae0faeb0a89f54ef4023f3be3692dcb529e51/Hasumi.glb";
+        /* The three Hasumi files in the archive. Pinned to a commit, not to
+           `main`: a force-push or a rename upstream can then never change what
+           this page fetches. The URL is stored pre-encoded — parentheses are
+           legal raw in a path segment, but the spaces are not. */
+        var REPO =
+          "https://cdn.jsdelivr.net/gh/lihaohong6/BlueArchiveModels@525ae0faeb0a89f54ef4023f3be3692dcb529e51/";
+        var VARIANTS = [
+          { label: "Uniform", file: "Hasumi.glb" },
+          { label: "Sportswear", file: "Hasumi%20(Sportswear).glb" },
+          { label: "Swimsuit", file: "Hasumi%20(Swimsuit).glb" },
+        ];
 
-        var CREAM = 0xefe7d6;
+        /* The light rig's two warm sources, named for the page's own palette:
+           a cream key and a gold rim, so the figure is lit in the same two
+           lights the rest of the page is drawn in. */
+        var CREAM = 0xfff4e2;
         var GOLD = 0xc6a053;
         var IDLE_CLIP = "Cafe_Idle";
 
@@ -8977,12 +9016,19 @@
           frames: 0,
           motion: false,
           fit: null,
+          /* The costume row's own public state: which one is on screen, and
+             which files the visit has already paid for. */
+          variant: 0,
+          loading: false,
+          loaded: [],
         };
 
         var overlay = null,
           stage = null,
           canvas = null,
           noteEl = null,
+          pickEl = null,
+          pickBtns = [],
           closeBtn = null,
           renderer = null,
           scene = null,
@@ -8993,6 +9039,7 @@
           rafId = 0,
           lastT = 0,
           closing = false,
+          token = 0,
           restoreFocus = null,
           onVis = null;
 
@@ -9063,50 +9110,22 @@
           return libPromise;
         }
 
-        /* ---- the engraved surface ---------------------------------------
-           The model's own materials are all replaced. A dark navy body keeps
-           the figure reading as carved stone; a fresnel term mixes cream and
-           gold along every silhouette edge, so the light appears to come from
-           the carving itself. The fragment code is appended to the standard
-           material's shader, and `customProgramCacheKey` keeps each variant in
-           its own program (a GLSL error here fails silently — the mesh simply
-           does not draw). */
-        var BODY_SHADER = [
-          /* The halo ships with zero-length normals on every vertex (230 verts,
-             all (0,0,0)) — and three.js normalizes in the vertex shader, so by
-             the time this fragment code runs, `normal` is already NaN rather
-             than zero. Every comparison with NaN is false, so a plain
-             `nlen < 0.25` test never fires and the NaN runs through the
-             lighting below, painting the plane black — darker than the page
-             behind it, which is how it announces itself. `!(nlen > 0.25)` is
-             true for NaN and for zero alike: fall back to a view-facing
-             normal, and — because the standard material's own lit colour is
-             already NaN by then — substitute the base colour outright. */
-          "vec3 nrm = normal;",
-          "float nlen = dot(nrm, nrm);",
-          "bool degen = !(nlen > 0.25);",
-          "nrm = degen ? vec3(0.0, 0.0, 1.0) : nrm * inversesqrt(nlen);",
-          "vec3 vdir = normalize(vViewPosition);",
-          "float fres = pow(1.0 - clamp(dot(nrm, vdir), 0.0, 1.0), 2.4);",
-          "float up = pow(clamp(nrm.y, 0.0, 1.0), 2.0) * 0.20;",
-          /* uFloor is the one per-mesh difference: the halo is a flat billboard
-             aimed at the camera, so its fresnel is ~0 across the whole surface
-             and it needs a luminance floor to glow at all. */
-          "float lum = clamp(max(fres * 0.95 + up, uFloor), 0.0, 1.0);",
-          "vec3 line = mix(uCream, uGold, clamp(fres * uGoldBias * 1.15 + up * 1.8, 0.0, 1.0));",
-          "vec3 base = degen ? uBase : gl_FragColor.rgb;",
-          "gl_FragColor.rgb = mix(base, line, lum);",
-        ].join("\n");
-        var U = {
-          cream: { value: null },
-          gold: { value: null },
-          goldBias: { value: 0.5 },
-          thick: { value: 0.003 },
-          floor: { value: 0.0 },
-        };
+        /* ---- the figure --------------------------------------------------
+           The model's own materials are kept exactly as exported: this is
+           Hasumi as she ships, textures and all, not a re-shading of her.
+           What makes those lit PBR surfaces read against the navy is the
+           light rig built in start(); nothing here touches a colour or a
+           texture.
 
-        /* True when a geometry's normals are unusable — no outline hull can be
-           offset along a zero normal, so such a mesh gets no hull at all. */
+           The halo, though, ships with two export defects that a lit material
+           cannot paper over, and both are repaired here rather than dressed
+           up: its normals are all zero-length, so there is no direction to
+           shade from and it paints flat black; and its texture's alpha — a
+           soft field sitting near 0.41 across most of the plane — is ignored
+           because the material is declared OPAQUE, which turns the billboard
+           into a grey box floating over the figure. Rebuilding the normals
+           and honouring the alpha the artist actually painted are data fixes,
+           not a re-shade. */
         function degenerateNormals(geo) {
           var n = geo && geo.attributes && geo.attributes.normal;
           if (!n || !n.count) return true;
@@ -9118,65 +9137,35 @@
           }
           return true;
         }
-
-        function bodyMat(floor) {
-          var m = new THREE.MeshStandardMaterial({
-            color: 0x121a2e,
-            roughness: 0.62,
-            metalness: 0.0,
-            emissive: new THREE.Color(0x060a14),
-            emissiveIntensity: 1.0,
-            side: THREE.DoubleSide,
-          });
-          /* Each variant needs its own program, so the floor is baked into the
-             cache key rather than living only in the uniform. */
-          var tag = floor > 0 ? "lit" : "plain";
-          m.onBeforeCompile = function (sh) {
-            sh.uniforms.uCream = U.cream;
-            sh.uniforms.uGold = U.gold;
-            sh.uniforms.uGoldBias = U.goldBias;
-            sh.uniforms.uFloor = { value: floor };
-            sh.uniforms.uBase = { value: new THREE.Color(0x121a2e) };
-            sh.fragmentShader = sh.fragmentShader
-              .replace(
-                "#include <common>",
-                "#include <common>\nuniform vec3 uCream; uniform vec3 uGold; uniform float uGoldBias; uniform float uFloor; uniform vec3 uBase;",
-              )
-              .replace(
-                "#include <dithering_fragment>",
-                "#include <dithering_fragment>\n" + BODY_SHADER,
-              );
-          };
-          m.customProgramCacheKey = function () {
-            return "hasumiBody-" + tag;
-          };
-          return m;
+        function repairHalo(o) {
+          if (degenerateNormals(o.geometry)) o.geometry.computeVertexNormals();
+          var m = o.material;
+          if (m && !Array.isArray(m) && m.map && !m.transparent && textureHasAlpha(m.map)) {
+            m.transparent = true;
+            m.needsUpdate = true;
+          }
         }
-        /* The outline is the classic inverted hull: the same mesh drawn
-           back-faces-only and pushed a hair along its own normals, so only a
-           thin rim survives around the silhouette. */
-        function outlineMat() {
-          var m = new THREE.MeshStandardMaterial({
-            color: GOLD,
-            roughness: 0.6,
-            metalness: 0.0,
-            emissive: new THREE.Color(GOLD),
-            emissiveIntensity: 0.9,
-            side: THREE.BackSide,
-          });
-          m.onBeforeCompile = function (sh) {
-            sh.uniforms.uThick = U.thick;
-            sh.vertexShader =
-              "uniform float uThick;\n" +
-              sh.vertexShader.replace(
-                "#include <begin_vertex>",
-                "#include <begin_vertex>\ntransformed += objectNormal * uThick;",
-              );
-          };
-          m.customProgramCacheKey = function () {
-            return "hasumiOutline";
-          };
-          return m;
+        /* True when the texture actually carries transparency the material is
+           ignoring. The uniform's halo is a soft field near 0.41 alpha; the
+           swimsuit's is a fully opaque gradient — same OPAQUE declaration,
+           different data, so the decision is made from the pixels rather than
+           from the name. Downscaling to 64px interpolates, which only makes a
+           partially transparent field easier to catch. */
+        function textureHasAlpha(map) {
+          try {
+            var img = map.image;
+            if (!img || !img.width || !img.height) return false;
+            var c = document.createElement("canvas");
+            c.width = Math.min(img.width, 64);
+            c.height = Math.min(img.height, 64);
+            var ctx = c.getContext("2d");
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            var d = ctx.getImageData(0, 0, c.width, c.height).data;
+            for (var i = 3; i < d.length; i += 4) {
+              if (d[i] < 250) return true;
+            }
+          } catch (e) {}
+          return false;
         }
 
         /* A skinned mesh's own bounding box describes its BIND pose, not the
@@ -9185,17 +9174,15 @@
            well below where the halo floats. Framing off that box leaves the
            figure small and riding high in its frame. So measure the real
            thing: push every skinned vertex through its bones (the same maths
-           the GPU runs), and union that with the static meshes. Runs once, on
-           open; the idle pose is applied first so it measures the figure the
+           the GPU runs), and union that with the static meshes. Runs once per
+           mount; the idle pose is applied first so it measures the figure the
            visitor will actually see. */
         function measure(root) {
           var box = new THREE.Box3();
           var v = new THREE.Vector3();
           root.updateWorldMatrix(true, true);
           root.traverse(function (o) {
-            /* The outline hulls share their source's geometry and skeleton, so
-               they would only re-measure the same vertices. */
-            if (!o.visible || !o.geometry || o.userData.hull) return;
+            if (!o.visible || !o.geometry) return;
             var pos = o.geometry.attributes && o.geometry.attributes.position;
             if (!pos) return;
             /* r147 calls this boneTransform; later releases renamed it. It
@@ -9221,8 +9208,44 @@
           return box;
         }
 
-        /* ---- build ------------------------------------------------------ */
-        function build(gltf) {
+        /* ---- build ------------------------------------------------------
+           Everything the current figure owns is released here before the next
+           one is mounted: geometries, the materials the loader built, and every
+           texture those materials carry. */
+        var modelRoot = null;
+        function disposePivot() {
+          if (mixer) {
+            mixer.stopAllAction();
+            if (modelRoot && mixer.uncacheRoot) mixer.uncacheRoot(modelRoot);
+            mixer = null;
+          }
+          if (modelRoot) {
+            modelRoot.traverse(function (o) {
+              if (o.geometry) o.geometry.dispose();
+              var mats = Array.isArray(o.material)
+                ? o.material
+                : o.material
+                  ? [o.material]
+                  : [];
+              mats.forEach(function (m) {
+                Object.keys(m).forEach(function (k) {
+                  var v = m[k];
+                  if (v && v.isTexture) v.dispose();
+                });
+                m.dispose();
+              });
+            });
+            modelRoot = null;
+          }
+          if (pivot) {
+            for (var i = pivot.children.length - 1; i >= 0; i--) {
+              pivot.remove(pivot.children[i]);
+            }
+          }
+          state.meshes = 0;
+        }
+
+        function mount(gltf) {
           var root = gltf.scene;
           var meshes = [];
 
@@ -9241,30 +9264,21 @@
               o.visible = false;
               return;
             }
+            /* The halo's billboard is the one mesh with export damage; see
+               repairHalo. Everything else is left exactly as it arrived. */
+            if (/Halo/i.test(o.name)) repairHalo(o);
             meshes.push(o);
           });
 
-          meshes.forEach(function (o) {
-            /* The halo is a flat billboard plane, not a solid: it needs the
-               luminance floor, the body does not. */
-            o.material = bodyMat(/Halo/i.test(o.name) ? 0.34 : 0);
-          });
-          meshes.forEach(function (o) {
-            /* A mesh whose normals are all zero cannot have an outline: the
-               hull is offset along those normals, so there would be nothing to
-               offset and the two copies would z-fight instead. The halo is the
-               one such mesh, and it is a glowing ring anyway. */
-            if (degenerateNormals(o.geometry)) return;
-            var hull = o.clone();
-            hull.material = outlineMat();
-            hull.renderOrder = -1;
-            hull.frustumCulled = false;
-            hull.userData.hull = true;
-            o.parent.add(hull);
-          });
-          state.meshes = meshes.length;
+          /* Out with the old before the new one lands: the two share a pivot,
+             and the outgoing model's textures would otherwise be held alive. */
+          disposePivot();
 
+          /* The materials are left exactly as the loader built them — this is
+             the model as it ships. */
+          state.meshes = meshes.length;
           pivot.add(root);
+          modelRoot = root;
 
           /* The idle is started here, before measuring, so the figure is
              framed in the pose it will hold — and so a reduced-motion visitor
@@ -9308,6 +9322,30 @@
           camera.position.set(0, 0, dist * 1.06);
           camera.lookAt(0, 0, 0);
           state.fit = { h: +size.y.toFixed(3), dist: +dist.toFixed(3) };
+
+          ensureLoop();
+        }
+
+        /* The rAF loop exists only while there is something to animate: under
+           reduced motion (or with no idle clip) the figure is drawn once and
+           the loop is left off. */
+        function ensureLoop() {
+          if (!renderer) return;
+          if (state.motion) {
+            if (!rafId) {
+              lastT = 0;
+              rafId = requestAnimationFrame(tick);
+            }
+          } else {
+            if (rafId) {
+              cancelAnimationFrame(rafId);
+              rafId = 0;
+            }
+            if (modelRoot) {
+              renderer.render(scene, camera);
+              state.frames++;
+            }
+          }
         }
 
         function onResize() {
@@ -9317,7 +9355,7 @@
           renderer.setSize(w, h, false);
           camera.aspect = w / h;
           camera.updateProjectionMatrix();
-          if (!state.motion) renderer.render(scene, camera);
+          if (!state.motion && modelRoot) renderer.render(scene, camera);
         }
 
         function tick(t) {
@@ -9371,6 +9409,26 @@
           name.innerHTML = '<i class="hasumi-rule"></i>Hasumi';
           foot.appendChild(noteEl);
           foot.appendChild(name);
+
+          /* The costume row, under the name plate. Built with the overlay so
+             the buttons are there from the first frame; they stay disabled
+             until the first figure is on screen. */
+          pickEl = mk("div", "hasumi-pick");
+          pickEl.setAttribute("role", "group");
+          pickEl.setAttribute("aria-label", "Costume");
+          pickBtns = VARIANTS.map(function (v, i) {
+            var b = mk("button");
+            b.type = "button";
+            b.textContent = v.label;
+            b.disabled = true;
+            b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+            b.onclick = function () {
+              pick(i);
+            };
+            pickEl.appendChild(b);
+            return b;
+          });
+          foot.appendChild(pickEl);
           overlay.appendChild(foot);
 
           closeBtn = mk("button", "hasumi-close");
@@ -9379,10 +9437,6 @@
           closeBtn.innerHTML = "&times;";
           closeBtn.onclick = close;
           overlay.appendChild(closeBtn);
-
-          overlay.onclick = function (e) {
-            if (e.target === overlay) close();
-          };
 
           document.body.appendChild(overlay);
           lockScroll(true);
@@ -9427,18 +9481,21 @@
           pivot = new THREE.Group();
           scene.add(pivot);
 
-          U.cream.value = new THREE.Color(CREAM);
-          U.gold.value = new THREE.Color(GOLD);
-
-          scene.add(new THREE.AmbientLight(0x2a3555, 1.0));
-          var key = new THREE.DirectionalLight(0xefe7d6, 0.85);
-          key.position.set(-1.4, 2.2, 2.4);
+          /* The figure is the model's own lit PBR surfaces now, so it needs a
+             light rig. Three sources, all warmed to the page: a broad cream key
+             from the front-left, a gold rim from behind-right that separates
+             her from the navy, and a cool bounce underneath so the shadowed
+             side does not go to mud. The ambient keeps the darkest facets above
+             the ground rather than silhouetting her. */
+          scene.add(new THREE.AmbientLight(0x39466b, 1.25));
+          var key = new THREE.DirectionalLight(CREAM, 1.45);
+          key.position.set(-1.6, 2.3, 2.6);
           scene.add(key);
-          var rim = new THREE.DirectionalLight(0xc6a053, 1.25);
-          rim.position.set(1.8, 0.9, -2.2);
+          var rim = new THREE.DirectionalLight(GOLD, 1.35);
+          rim.position.set(1.9, 1.0, -2.3);
           scene.add(rim);
-          var under = new THREE.DirectionalLight(0x8fa6d8, 0.35);
-          under.position.set(0.4, -2.0, 0.6);
+          var under = new THREE.DirectionalLight(0x8fa6d8, 0.45);
+          under.position.set(0.4, -2.2, 0.7);
           scene.add(under);
 
           onResize();
@@ -9456,33 +9513,93 @@
             window.addEventListener("resize", onResize);
           }
 
-          new THREE.GLTFLoader().load(
-            GLB_URL,
+          loadVariant(0);
+        }
+
+        /* ---- the costumes -------------------------------------------------
+           Only the first file is fetched on open. The other two are fetched
+           the first time their button is pressed — a 4.6–6.2 MB download that
+           a visitor who never presses the button never pays for. `loaded`
+           records what has been fetched at least once; the figure itself is
+           still disposed on every switch, because three of them at once is
+           three times the GPU memory for one that is on screen, and a repeat
+           switch costs nothing but a re-parse out of the browser's own HTTP
+           cache. */
+        var loader = null;
+        function setPicking(on) {
+          pickBtns.forEach(function (b) {
+            b.disabled = !on;
+          });
+        }
+        function setActive(i) {
+          state.variant = i;
+          pickBtns.forEach(function (b, k) {
+            b.setAttribute("aria-pressed", k === i ? "true" : "false");
+          });
+        }
+
+        /* A button press. The active costume's own button is inert; any other
+           starts a fetch (or re-parse) and swaps the figure in when it lands. */
+        function pick(i) {
+          if (!overlay || state.loading) return;
+          if (i === state.variant && modelRoot) return;
+          if (!VARIANTS[i]) return;
+          loadVariant(i);
+        }
+
+        function loadVariant(i) {
+          if (!renderer || !overlay || state.loading) return;
+          if (i === state.variant && modelRoot) return;
+
+          state.loading = true;
+          state.error = null;
+          setPicking(false);
+          if (noteEl) {
+            noteEl.textContent = modelRoot
+              ? "Changing…"
+              : "Raising the plate…";
+          }
+
+          var my = ++token;
+          if (!loader) loader = new THREE.GLTFLoader();
+          loader.load(
+            REPO + VARIANTS[i].file,
             function (gltf) {
-              if (!overlay || !renderer) return; /* closed while in flight */
+              /* Closed, or a later press has taken over, while this was in
+                 flight: drop it rather than mounting a stale figure. */
+              if (my !== token || !overlay || !renderer) return;
               try {
-                build(gltf);
+                mount(gltf);
               } catch (e) {
-                fail(e);
+                variantFailed(e);
                 return;
               }
-              noteEl.textContent = "";
+              if (state.loaded.indexOf(i) === -1) state.loaded.push(i);
+              state.loading = false;
+              setActive(i);
+              setPicking(true);
+              if (noteEl) noteEl.textContent = "";
               state.status = "ready";
-              /* Reduced motion draws the carving once and stops: no rAF loop
-                 is left running behind a still image. */
-              if (state.motion) {
-                lastT = 0;
-                rafId = requestAnimationFrame(tick);
-              } else {
-                renderer.render(scene, camera);
-                state.frames++;
-              }
             },
             undefined,
             function (err) {
-              fail(err || new Error("model failed to load"));
+              if (my !== token || !overlay) return;
+              variantFailed(err || new Error("model failed to load"));
             },
           );
+        }
+
+        function variantFailed(err) {
+          state.loading = false;
+          state.error = (err && err.message) || String(err);
+          /* A switch that fails leaves the figure already up untouched, and
+             says so; only a failure with nothing on screen is fatal. */
+          if (modelRoot) {
+            if (noteEl) noteEl.textContent = "That costume would not load.";
+            setPicking(true);
+            return;
+          }
+          fail(err);
         }
 
         function fail(err) {
@@ -9500,6 +9617,10 @@
           if (!overlay || closing) return;
           closing = true;
           state.status = "closed";
+          /* Any download still in flight belongs to a session that is now
+             gone; bumping the token makes its callbacks no-ops. */
+          token++;
+          state.loading = false;
 
           if (rafId) cancelAnimationFrame(rafId);
           rafId = 0;
@@ -9527,44 +9648,35 @@
             if (gone.parentNode) gone.parentNode.removeChild(gone);
           }, 400);
 
-          /* Everything the GPU holds is released here: geometries, the
-             generated programs, the textures the loader prepared, and finally
-             the context itself. Without the context loss a browser keeps the
-             (small, but real) WebGL context alive against its per-page cap. */
-          if (scene) {
-            scene.traverse(function (o) {
-              if (o.geometry) o.geometry.dispose();
-              var mats = Array.isArray(o.material)
-                ? o.material
-                : o.material
-                  ? [o.material]
-                  : [];
-              mats.forEach(function (m) {
-                Object.keys(m).forEach(function (k) {
-                  var v = m[k];
-                  if (v && v.isTexture) v.dispose();
-                });
-                m.dispose();
-              });
-            });
-          }
+          /* Chromium paints a canvas whose WebGL context has been lost as an
+             opaque WHITE rectangle — and this one is still on screen for the
+             length of the overlay's fade, which is exactly the white box that
+             appears when the plate is closed. Hide it before the context goes,
+             so the plate dims out instead of flashing. */
+          if (canvas) canvas.style.visibility = "hidden";
+
+          /* Everything the GPU holds is released here: the current figure's
+             geometries, materials and textures, then the context itself.
+             Without the context loss a browser keeps the (small, but real)
+             WebGL context alive against its per-page cap. The lights and the
+             camera carry nothing to free. */
+          disposePivot();
           if (renderer) {
             renderer.dispose();
             if (renderer.forceContextLoss) renderer.forceContextLoss();
-          }
-          if (mixer) {
-            mixer.stopAllAction();
-            if (mixer.uncacheRoot && scene) mixer.uncacheRoot(scene);
           }
 
           scene = null;
           camera = null;
           pivot = null;
+          modelRoot = null;
           mixer = null;
           renderer = null;
           canvas = null;
           stage = null;
           noteEl = null;
+          pickEl = null;
+          pickBtns = [];
           closeBtn = null;
           closing = false;
         }
@@ -9612,6 +9724,8 @@
           open: open,
           close: close,
           canTrigger: canTrigger,
+          pick: pick,
+          variants: VARIANTS,
         };
       })();
     </script>
