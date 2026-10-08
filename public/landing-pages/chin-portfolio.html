@@ -2315,11 +2315,21 @@
         gap: 0.7em;
         appearance: none;
         -webkit-appearance: none;
-        background: transparent;
+        background-color: transparent;
+        /* A gold layer parked off-stage at the right edge; :active wipes it in.
+           Kept as a background-image (not the hover shorthand) so the sweep
+           survives on touch, where there is no hover to flood the pill. */
+        background-image: linear-gradient(var(--accent-text), var(--accent-text));
+        background-repeat: no-repeat;
+        background-position: right center;
+        background-size: 0% 100%;
         border: 1px solid var(--hairline);
         border-radius: 999px;
         padding: 11px 24px;
         cursor: pointer;
+        /* A hold must own the gesture: without this the browser can claim the
+           touch as a pan and fire pointercancel mid-hold, cancelling the exit. */
+        touch-action: none;
         font-family: var(--font);
         font-size: clamp(10px, 0.95vw, 12px);
         letter-spacing: var(--track-caps);
@@ -2328,7 +2338,8 @@
         opacity: 0;
         visibility: hidden;
         transition: opacity 0.6s ease, visibility 0.6s ease,
-          color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+          color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease,
+          background-size 0.42s cubic-bezier(0.4, 0, 0.2, 1), transform 0.12s ease;
       }
       .intro-continue.is-on {
         opacity: 1;
@@ -2339,16 +2350,55 @@
         line-height: 1;
         transition: transform 0.2s ease;
       }
+      /* Hover / keyboard focus is a QUIET lift — gold border, brighter cream
+         text — and deliberately NOT a full gold flood. The full gold is
+         reserved for the hold fill (.is-holding), so the progress of a hold
+         stays legible on desktop, where a hover flood would otherwise have
+         already turned the pill gold before the press began. Declared BEFORE
+         the hold rules so the hold fill wins the tie at equal specificity. */
       .intro-continue:hover,
       .intro-continue:focus-visible {
-        color: var(--accent-ink);
-        background: var(--accent-text);
+        color: var(--ink);
         border-color: var(--accent-text);
         outline: none;
       }
       .intro-continue:hover .intro-continue-arrow,
       .intro-continue:focus-visible .intro-continue-arrow {
         transform: translateX(3px);
+      }
+      /* Hold-to-confirm. A pointer press starts a ~900ms fill: the gold layer
+         parked at the right (base rule) wipes in from 0% to 100% as the hold
+         runs. Reach 100% and enterPage() fires; let go first and the fill
+         retracts with no exit. The class is JS-driven (set on pointerdown,
+         removed on release/cancel) because :active cannot be cancelled mid-way.
+         Declared AFTER :hover/:focus-visible so a desktop hover cannot blank the
+         ink text mid-hold. Keyboard (Space / Enter) stays INSTANT — see
+         onIntroKey() — so a motor / AT visitor is never forced to hold. */
+      .intro-continue.is-holding {
+        background-size: 100% 100%;
+        background-color: color-mix(in srgb, var(--accent-text) 14%, transparent);
+        color: var(--accent-ink);
+        border-color: var(--accent-text);
+        /* The fill runs for the WHOLE hold (0.9s, linear) so the pill reaches
+           full gold exactly as the gate fires. Releasing early then reads as an
+           interrupted fill, not a completed one that mysteriously did nothing.
+           The 0.42s cubic-bezier is restored on release, so the retract is
+           snappy. */
+        transition: background-size 0.9s linear, color 0.2s ease,
+          border-color 0.2s ease, background-color 0.2s ease,
+          transform 0.12s ease, opacity 0.6s ease, visibility 0.6s ease;
+      }
+      /* A short press (below the hold threshold) shows the pill press down a
+         hair, then snap back — visible feedback for a tap that does NOT exit,
+         so the tap never reads as ignored. */
+      .intro-continue.is-nudge {
+        transform: translateX(-50%) scale(0.98);
+      }
+      /* :active is now decorative ONLY — no sweep, no gate. It keeps a small
+         press-down and lets the hold fill (is-holding) own the sweep, so a
+         tap-and-release cannot flash a full pill. */
+      .intro-continue:active {
+        transform: translateX(-50%) scale(0.98);
       }
       /* The entrance holds indefinitely, so under reduced motion the button is
          the ONLY way through the cover: it must be visible from the start. */
@@ -2357,6 +2407,20 @@
           opacity: 1;
           visibility: visible;
           transition: none;
+        }
+        /* No motion at all: the hold gate is bypassed under reduced motion
+           (see the JS), so a plain press / click exits. Cancel the fill and the
+           nudge so a tap cannot animate anything; keep a static ink/gold press
+           so the feedback survives without motion. */
+        .intro-continue:active,
+        .intro-continue.is-nudge {
+          transform: translateX(-50%);
+          color: var(--accent-ink);
+          border-color: var(--accent-text);
+        }
+        .intro-continue.is-holding {
+          background-size: 0% 100%;
+          background-color: transparent;
         }
       }
       .intro-continue.is-gone {
@@ -3247,6 +3311,21 @@
          ===================================================================== */
       html:not(.js) .intro-stage,
       html.js-failed .intro-stage {
+        display: none !important;
+      }
+      /* The Continue chip is a sibling of .intro-stage, so hiding the stage
+         leaves it behind. WITHOUT scripting there is no cover and no handler,
+         so the chip must not float — that is the only case this guards.
+         It is deliberately NOT gated on .js-failed: `js-failed` is added by the
+         6s watchdog whenever body[data-ready] !== "1" (slow image/font decodes),
+         and by then the intro block has already armed `intro-lock`, `inert` on
+         main/header and the wheel/touch swallow guards. The chip is the ONLY
+         pointer-reachable control that calls enterPage() -> release(), which is
+         the sole code that lifts the lock and the inert trap — so hiding it on
+         `js-failed` would brick the page for every pointer/touch visitor on a
+         slow load. (`html:not(.js)` cannot arm the intro at all: the whole
+         block is script, so no lock or trap exists there.) */
+      html:not(.js) .intro-continue {
         display: none !important;
       }
       html:not(.js) .scroll-reveal,
@@ -7191,6 +7270,16 @@
              only create it as a sloppy-mode global, and a keypress during the
              entrance would read an undeclared name and throw a ReferenceError. */
           let continueReady = false;
+          /* Hold-to-confirm state (pointer / touch). A press must be HELD for
+             HOLD_MS before the cover lifts, so a stray tap on a phone cannot
+             skip the reveal. `holdTimer` is the pending release; `holding` is
+             true between pointerdown and pointerup; `nudgeTimer` clears the
+             short-press nudge. The keyboard exit is deliberately NOT gated by
+             these — see onIntroKey(). */
+          var HOLD_MS = 900;
+          var holdTimer = 0;
+          var holding = false;
+          var nudgeTimer = 0;
           /* The entrance's shared state. `tl` / `backstopId` are the animation
              handles `dismiss()` must be able to kill; `closed` is set the
              moment a dismissal begins, so a late timer can tell "user already
@@ -7473,10 +7562,62 @@
              is wired to the hand-off, not to onSkip. Registered here so the
              listener exists for the whole entrance; it is a no-op until the
              plates have settled (continueReady). */
+          /* Hold-to-confirm on the pointer path. A press arms a HOLD_MS fill
+             (.is-holding); if the hold completes, enterPage() fires. Releasing
+             early retracts the fill and shows a short nudge, and the trailing
+             click is ignored, so a stray tap can no longer skip the reveal.
+             Under reduced motion there is NO hold — a plain press exits at
+             once — and the keyboard exit (Space / Enter, detail === 0) stays
+             instant, so nobody is forced to hold. */
           if (continueBtn) {
+            var cancelHold = function (showNudge) {
+              if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = 0;
+              }
+              if (!holding) return;
+              holding = false;
+              continueBtn.classList.remove("is-holding");
+              if (showNudge && !REDUCED) {
+                continueBtn.classList.add("is-nudge");
+                clearTimeout(nudgeTimer);
+                nudgeTimer = setTimeout(function () {
+                  continueBtn.classList.remove("is-nudge");
+                }, 220);
+              }
+            };
+            continueBtn.addEventListener("pointerdown", function (e) {
+              if (!continueReady || holding || REDUCED) return;
+              if (e.pointerType === "mouse" && e.button !== 0) return;
+              holding = true;
+              clearTimeout(nudgeTimer);
+              continueBtn.classList.remove("is-nudge");
+              continueBtn.classList.add("is-holding");
+              holdTimer = setTimeout(function () {
+                holdTimer = 0;
+                holding = false;
+                /* Keep .is-holding so the fill stays gold through the exit;
+                   dismiss() fades the whole chip out. */
+                enterPage();
+              }, HOLD_MS);
+            });
+            continueBtn.addEventListener("pointerup", function () {
+              cancelHold(true);
+            });
+            continueBtn.addEventListener("pointercancel", function () {
+              cancelHold(false);
+            });
+            continueBtn.addEventListener("pointerleave", function () {
+              cancelHold(false);
+            });
+            /* The click path: keyboard activation (detail === 0) and, under
+               reduced motion, any press exit instantly. A pointer-derived click
+               (detail > 0) is NOT an exit — the hold owns it — so a quick tap
+               that released early is deliberately ignored. */
             continueBtn.addEventListener("click", function (e) {
               e.preventDefault();
-              if (continueReady) enterPage();
+              if (!continueReady) return;
+              if (e.detail === 0 || REDUCED) enterPage();
             });
           }
 
