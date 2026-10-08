@@ -278,6 +278,23 @@
       .skip-link:focus{
         transform:translateY(0);opacity:1;pointer-events:auto;outline:2px solid var(--paper);outline-offset:2px;
       }
+      /* The intro cover hands focus to <main class="page"> when it closes (see
+         dismiss() in initIntroStage: land.setAttribute("tabindex","-1");
+         land.focus()). <main> is a landmark, not an interactive control — its
+         default focus ring is never useful and only ever appears from that
+         programmatic hand-off. In a dark color-scheme that ring is the bright
+         auto-contrast outline the browser paints around <main>'s full height,
+         which reads as a white box from top to bottom that only clears when
+         the visitor clicks elsewhere (moving focus off it). Kill it on both
+         :focus (programmatic/mouse) and :focus-visible; keyboard users still
+         get rings on the real links inside, which have their own :focus-visible
+         rules. The same cover also sets `inert` on header.top and
+         .scroll-progress-brush, but it never focuses them, so they need no
+         matching rule. */
+      main.page:focus,
+      main.page:focus-visible {
+        outline: none;
+      }
       html,body{margin:0;padding:0}
       html{-webkit-text-size-adjust:100%}
       body{
