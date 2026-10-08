@@ -379,9 +379,60 @@
       }
       .top nav > a{
         position:relative;
+        display:inline-flex;align-items:center;gap:.5em;
         color:var(--ink-soft-text);
         padding-bottom:3px;
         transition:color .25s ease;
+      }
+      /* ---- Accession index ----
+         Each nav link carries its catalogue number, the same archival idiom
+         the section kickers and the plate cards already use. Gold-leaf, caps,
+         hairline weight: it reads as an engraver's plate number, not a
+         Webflow badge. Static — it never moves on hover, it only shifts to
+         full ink with the label. */
+      .top nav > a .nav-i{
+        font-family:var(--font);
+        font-size:.68em;line-height:1;letter-spacing:.1em;
+        font-weight:400;font-variant-numeric:tabular-nums;
+        color:var(--earth-text);opacity:.8;
+        transition:opacity .25s ease;
+      }
+      .top nav > a:hover .nav-i,
+      .top nav > a:focus-visible .nav-i,
+      .top nav > a[aria-current] .nav-i{opacity:1}
+      /* ---- Label mask box ----
+         The label sits in an overflow:hidden box with a second copy stacked
+         directly beneath it; on hover the box swaps the two so the word reads
+         as if the plate were turned over. Whole-label, one-shot, block-level —
+         it belongs to this page's printed-reveal language (rise / rule / wipe),
+         not to a per-character kinetic wave.
+
+         The mask lives on an INNER span, never on the anchor: the ::before
+         44px hit box (top:-8px;bottom:-20px) and the ::after --earth underline
+         stay on the <a> and are never clipped. */
+      .top nav > a .nav-mask{
+        position:relative;display:inline-block;overflow:hidden;
+        vertical-align:bottom;line-height:1.15;
+      }
+      .top nav > a .nav-mask .is-2{
+        position:absolute;left:0;top:0;
+        transform:translateY(110%);
+      }
+      .top nav > a .nav-mask span{
+        display:block;
+        transition:transform .42s cubic-bezier(.4,0,.2,1);
+      }
+      /* Copy 1 rises out of the box, copy 2 rises into it — both travel exactly
+         one line, so the swap reads as one printed word turning over. The
+         scroll-spy's aria-current only brightens the number (above); it does
+         not park copy 2 on top, so a hover on the active link still animates. */
+      .top nav > a:hover .nav-mask .is-1,
+      .top nav > a:focus-visible .nav-mask .is-1{
+        transform:translateY(-110%);
+      }
+      .top nav > a:hover .nav-mask .is-2,
+      .top nav > a:focus-visible .nav-mask .is-2{
+        transform:translateY(0);
       }
       /* Tap-target expansion via a pseudo-element, so the 15px link text and
          its 3px underline keep their exact metrics. The links are flex items
@@ -1047,6 +1098,16 @@
       }
       @media (prefers-reduced-motion: reduce){
         .top nav > a::after,.bio-link-text::after,.bio-arrow{transition:none !important}
+        /* The label mask-swap is motion. Neutralise it entirely: no transition,
+           and the stacked second copy parked out of the box so it can never be
+           seen peeking below the first. */
+        .top nav > a .nav-mask span{transition:none !important}
+        .top nav > a .nav-mask .is-2{transform:translateY(110%) !important}
+        /* …and cancel the hover lift itself: with the transition off, lifting
+           copy 1 out of the one-line clip box would blank the label (copy 2 is
+           parked below), leaving only the number. */
+        .top nav > a:hover .nav-mask .is-1,
+        .top nav > a:focus-visible .nav-mask .is-1{transform:none !important}
         /* The scroll-reveal observer is skipped under reduced motion, so these
            elements would otherwise stay at opacity:0 forever. Force them shown. */
         .scroll-reveal{opacity:1 !important;transform:none !important;translate:none !important;transition:none !important}
@@ -3210,6 +3271,20 @@
       html.js-failed .light-sweep {
         display: none !important;
       }
+      /* The nav's stacked label copy is decorative; without scripting there is
+         no hover contract to keep, so park it out of the mask box — and cancel
+         copy 1's hover lift too, or hovering a link would slide the only copy
+         out of the one-line clip box and blank the label. */
+      html:not(.js) .nav-mask .is-2,
+      html.js-failed .nav-mask .is-2 {
+        display: none !important;
+      }
+      html:not(.js) .top nav > a:hover .nav-mask .is-1,
+      html:not(.js) .top nav > a:focus-visible .nav-mask .is-1,
+      html.js-failed .top nav > a:hover .nav-mask .is-1,
+      html.js-failed .top nav > a:focus-visible .nav-mask .is-1 {
+        transform: none !important;
+      }
       html:not(.js) .bc-wrap,
       html.js-failed .bc-wrap {
         height: auto;
@@ -3957,9 +4032,9 @@
       <header class="top">
         <a class="name" href="#">Jizdan YR</a>
         <nav>
-          <a href="#about">About</a>
-          <a href="#plates">Projects</a>
-          <a href="#contact">Contact</a>
+          <a href="#about"><span class="nav-i" aria-hidden="true">01</span><span class="nav-mask"><span class="is-1">About</span><span class="is-2" aria-hidden="true">About</span></span></a>
+          <a href="#plates"><span class="nav-i" aria-hidden="true">02</span><span class="nav-mask"><span class="is-1">Projects</span><span class="is-2" aria-hidden="true">Projects</span></span></a>
+          <a href="#contact"><span class="nav-i" aria-hidden="true">03</span><span class="nav-mask"><span class="is-1">Contact</span><span class="is-2" aria-hidden="true">Contact</span></span></a>
           <div class="top-socials">
             <a
               href="https://github.com/UnnamedPeople-Chin"
