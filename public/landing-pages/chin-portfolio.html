@@ -2336,6 +2336,14 @@
         /* A hold must own the gesture: without this the browser can claim the
            touch as a pan and fire pointercancel mid-hold, cancelling the exit. */
         touch-action: none;
+        /* A ~900ms hold is a LONG-PRESS to a phone. Without these, holding the
+           pill makes the browser start selecting the label text — the blue
+           selection box the user saw "ngeblok" on tap — and flashes the
+           platform's tap-highlight over the pill. The chip only ever wants a
+           hold, so both are suppressed. */
+        -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
+                user-select: none;
         font-family: var(--font);
         font-size: clamp(10px, 0.95vw, 12px);
         letter-spacing: var(--track-caps);
@@ -2612,6 +2620,10 @@
          and the riffle starts only from dismiss(), at +1240 — fired earlier it
          would flip the book to another page under the still-opaque cover, so
          the dissolve would reveal the wrong spread.
+
+         The Continue CHIP does NOT wait for that dissolve: enterPage() fades
+         it away at +700 (gone by ~1040ms), so the pill stops covering the
+         section below while the cover is still settling. See hideChip().
 
          The plate box's ::before (the cream sheet and its gold lip) fades out
          at the start: that sheet belongs to the ENTRANCE's ruled plate, and
@@ -7400,6 +7412,12 @@
           var holding = false;
           var nudgeTimer = 0;
           var pulseTimer = 0;
+          /* The chip's OWN exit, decoupled from the cover's dissolve: after a
+             completed hold the pill pulses, then leaves on its own (~1s after
+             the hold filled) so it never lingers over the section below while
+             the cover is still dissolving. `chipGone` latches it. */
+          var chipTimer = 0;
+          var chipGone = false;
           var gesture = { id: null, start: 0, rect: null };
           var motion = { raf: 0, p: 0, from: 0, to: 0, start: 0 };
           /* The entrance's shared state. `tl` / `backstopId` are the animation
@@ -7446,6 +7464,54 @@
             }
           }
 
+          /* Take the chip away on its own clock. After a completed hold the
+             pill is visually gone ~1s later (see enterPage()), long before the
+             cover has finished dissolving, so it never lingers over the section
+             below. dismiss() calls this too, so the instant paths and the chip's
+             own timer share one idempotent fade (the `chipGone` latch).
+
+             The DOM removal is DELIBERATELY deferred when the chip still holds
+             focus. The chip is the only focusable control while the cover is up,
+             and main.page stays `inert` until dismiss()'s handoff at +1240, so
+             detaching a focused chip at +1040 would drop focus to <body> for
+             ~200ms (a spurious document-focus event for a screen reader). A
+             keyboard Space/Enter exit and a desktop mouse hold both focus the
+             pill, so this is the common case, not an edge. Left in the DOM, the
+             pill is invisible (opacity 0) and inert to the pointer
+             (pointer-events:none) from +1040; dismiss()'s removeNow() then takes
+             it out AFTER the +1240 handoff. */
+          function hideChip(instant) {
+            if (!continueBtn || chipGone) return;
+            chipGone = true;
+            clearTimeout(chipTimer);
+            chipTimer = 0;
+            if (instant) {
+              continueBtn.style.display = "none";
+              if (continueBtn.parentNode) continueBtn.parentNode.removeChild(continueBtn);
+              return;
+            }
+            if (continueBtn.animate) {
+              continueBtn.animate(
+                [{ opacity: 1 }, { opacity: 0 }],
+                { duration: 340, easing: "ease-out", fill: "forwards" },
+              );
+            } else {
+              continueBtn.style.opacity = "0";
+            }
+            continueBtn.style.pointerEvents = "none";
+            /* Also drop it from the tab order: an opacity:0 button is still
+               focusable, so a Tab landing in this ~200ms window would put the
+               ring on an invisible pill. tabIndex -1 keeps a programmatic
+               focus (below) but removes it from Tab order. */
+            continueBtn.tabIndex = -1;
+            /* Hold on to a focused pill: let dismiss() remove it after the
+               handoff. Only detach early when it is not the active element. */
+            if (document.activeElement === continueBtn) return;
+            setTimeout(function () {
+              if (continueBtn.parentNode) continueBtn.parentNode.removeChild(continueBtn);
+            }, 340);
+          }
+
           function dismiss(instant) {
             if (dismissed) return;          /* its own latch: release() owns `closed` */
             dismissed = true;
@@ -7468,21 +7534,11 @@
             stage.classList.add("is-gone");
             /* The button is a sibling of the stage (it must not sit under
                aria-hidden), so it does not inherit the stage's .is-gone fade.
-               Fade it with the same 340ms the stage uses on the animated path
-               so the two leave together; the instant path hides it outright
-               and removeNow() takes it out of the DOM. */
-            if (continueBtn) {
-              if (instant) {
-                continueBtn.style.display = "none";
-              } else if (continueBtn.animate) {
-                continueBtn.animate(
-                  [{ opacity: 1 }, { opacity: 0 }],
-                  { duration: 340, easing: "ease-out", fill: "forwards" },
-                );
-              } else {
-                continueBtn.style.display = "none";
-              }
-            }
+               After a completed hold it is already on its own way out
+               (enterPage() schedules hideChip at +700); on the instant paths
+               (reduced motion, back/forward) it is hidden outright. Either way
+               hideChip is idempotent. */
+            hideChip(!!instant);
             if (instant) removeNow();
             else setTimeout(removeNow, 340);
 
@@ -7620,6 +7676,16 @@
             if (continueBtn) continueBtn.classList.add("is-on");
           }
           function enterPage() {
+            /* The pill leaves on its own ~1s after the cover is committed (the
+               600ms pulse ends, then a short beat, then the 340ms fade) — NOT at
+               the cover's +1240 dissolve — so it stops covering the next section.
+               Scheduled here so every commit path gets it: the pointer hold, the
+               keyboard Space/Enter exit and the reduced-motion click all run
+               through enterPage(). dismiss() also calls hideChip, so the instant
+               paths stay covered and the two never double-remove. */
+            if (continueBtn && !chipGone) {
+              chipTimer = setTimeout(function () { hideChip(false); }, 700);
+            }
             revealThenDismiss();     /* was: startRiffle(); dismiss(false); — the
                                         riffle now fires from the exit, at +1240,
                                         AFTER the cover has fully dissolved. */
