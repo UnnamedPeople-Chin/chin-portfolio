@@ -2305,6 +2305,16 @@
          tracked-caps chip that fills with the page's ink on hover — the same
          micro-label language as the rest of the site. */
       .intro-continue {
+        /* Wave-fill hold-to-confirm (ported from the HoldButton reference):
+           --ic-p is the 0..1 hold progress, written by rAF; --ic-w / --ic-h are
+           the measured box, written on press; --ic-wave is the crest amplitude;
+           --ic-cycles rolls the crest over the hold. */
+        --ic-p: 0;
+        --ic-w: 0px;
+        --ic-h: 0px;
+        --ic-wave: 6px;
+        --ic-cycles: 0.82;
+        --ic-ease: cubic-bezier(0.23, 1, 0.32, 1);
         position: fixed;
         left: 50%;
         bottom: clamp(30px, 7vh, 74px);
@@ -2316,13 +2326,9 @@
         appearance: none;
         -webkit-appearance: none;
         background-color: transparent;
-        /* A gold layer parked off-stage at the right edge; :active wipes it in.
-           Kept as a background-image (not the hover shorthand) so the sweep
-           survives on touch, where there is no hover to flood the pill. */
-        background-image: linear-gradient(var(--accent-text), var(--accent-text));
-        background-repeat: no-repeat;
-        background-position: right center;
-        background-size: 0% 100%;
+        /* The gold fill is no longer a background layer: it is a clipped crest
+           overlay (.intro-continue-fill + -crest), so the wave edge and the ink
+           label can ride the same 0..1 progress. */
         border: 1px solid var(--hairline);
         border-radius: 999px;
         padding: 11px 24px;
@@ -2337,18 +2343,76 @@
         color: var(--ink-soft-text);
         opacity: 0;
         visibility: hidden;
+        isolation: isolate;
+        /* No transition on --ic-p: the rAF owns the progress (a CSS transition
+           would fight the drive). The press-scale and the glow are CSS. */
         transition: opacity 0.6s ease, visibility 0.6s ease,
           color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease,
-          background-size 0.42s cubic-bezier(0.4, 0, 0.2, 1), transform 0.12s ease;
+          box-shadow 0.2s var(--ic-ease), transform 0.16s var(--ic-ease);
       }
       .intro-continue.is-on {
         opacity: 1;
         visibility: visible;
       }
+      /* The label sits above the overlay (z2). Its gold copy lives INSIDE the
+         clipped overlay, so it rides the same crest as the fill. */
+      .intro-continue .intro-continue-label {
+        position: relative;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.7em;
+        white-space: nowrap;
+      }
       .intro-continue .intro-continue-arrow {
         font-size: 1.15em;
         line-height: 1;
         transition: transform 0.2s ease;
+      }
+      /* The clip wrapper rounds the gold overlay to the pill so the crest sheet
+         cannot spill past the hairline. */
+      .intro-continue .intro-continue-clip {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        clip-path: inset(0 round 999px);
+        pointer-events: none;
+      }
+      /* The gold sheet, its right edge the travelling wave — --ic-p drives the
+         inset. */
+      .intro-continue .intro-continue-fill {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: var(--accent-text);
+        color: var(--accent-ink);
+        clip-path: inset(
+          0 calc((1 - var(--ic-p)) * (100% + 0.75 * var(--ic-wave)) - var(--ic-p) * 0.25 * var(--ic-wave)) 0 0
+        );
+      }
+      /* The same gold sheet, masked to a vertical wave and advanced with --ic-p,
+         so the fill's leading edge ripples as it travels. */
+      .intro-continue .intro-continue-crest {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: var(--accent-text);
+        color: var(--accent-ink);
+        -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='200' viewBox='0 0 20 200' preserveAspectRatio='none'%3E%3Cpath d='M0 0H10C18 8 18 25.3 10 33.3S2 58.7 10 66.7S18 92 10 100S2 125.3 10 133.3S18 158.7 10 166.7S2 192 10 200H0Z'/%3E%3C/svg%3E");
+                mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='200' viewBox='0 0 20 200' preserveAspectRatio='none'%3E%3Cpath d='M0 0H10C18 8 18 25.3 10 33.3S2 58.7 10 66.7S18 92 10 100S2 125.3 10 133.3S18 158.7 10 166.7S2 192 10 200H0Z'/%3E%3C/svg%3E");
+        -webkit-mask-repeat: repeat-y;
+                mask-repeat: repeat-y;
+        -webkit-mask-size: var(--ic-wave) calc(var(--ic-h) * 2);
+                mask-size: var(--ic-wave) calc(var(--ic-h) * 2);
+        -webkit-mask-position-x: calc(-1 * var(--ic-wave) + var(--ic-p) * (var(--ic-w) + var(--ic-wave)));
+                mask-position-x: calc(-1 * var(--ic-wave) + var(--ic-p) * (var(--ic-w) + var(--ic-wave)));
+        -webkit-mask-position-y: calc(-1 * var(--ic-p) * var(--ic-cycles) * var(--ic-h));
+                mask-position-y: calc(-1 * var(--ic-p) * var(--ic-cycles) * var(--ic-h));
+      }
+      .intro-continue .intro-continue-label--fill {
+        z-index: auto;
       }
       /* Hover / keyboard focus is a QUIET lift — gold border, brighter cream
          text — and deliberately NOT a full gold flood. The full gold is
@@ -2366,27 +2430,51 @@
       .intro-continue:focus-visible .intro-continue-arrow {
         transform: translateX(3px);
       }
-      /* Hold-to-confirm. A pointer press starts a ~900ms fill: the gold layer
-         parked at the right (base rule) wipes in from 0% to 100% as the hold
-         runs. Reach 100% and enterPage() fires; let go first and the fill
-         retracts with no exit. The class is JS-driven (set on pointerdown,
-         removed on release/cancel) because :active cannot be cancelled mid-way.
-         Declared AFTER :hover/:focus-visible so a desktop hover cannot blank the
-         ink text mid-hold. Keyboard (Space / Enter) stays INSTANT — see
-         onIntroKey() — so a motor / AT visitor is never forced to hold. */
+      /* Hold-to-confirm. A pointer press starts a ~900ms wave fill: --ic-p
+         drives the crest from 0 to 1 as the hold runs. Reach 1 and enterPage()
+         fires; let go first and the fill retracts with no exit. The class is
+         JS-driven (set on pointerdown, removed on release/cancel) because
+         :active cannot be cancelled mid-way. Declared AFTER :hover/:focus-visible
+         so a desktop hover cannot blank the ink text mid-hold. Keyboard
+         (Space / Enter) stays INSTANT — see onIntroKey() — so a motor / AT
+         visitor is never forced to hold. */
       .intro-continue.is-holding {
-        background-size: 100% 100%;
         background-color: color-mix(in srgb, var(--accent-text) 14%, transparent);
-        color: var(--accent-ink);
+        /* The base label stays CREAM through the hold: the dark-on-gold text
+           comes from the clipped copy (.intro-continue-label--fill), so this
+           layer must stay legible over the navy the fill has not yet reached.
+           (A single-layer build flipped the whole button to --accent-ink, which
+           left the unfilled half dark-on-dark and unreadable.) */
+        color: var(--ink);
         border-color: var(--accent-text);
-        /* The fill runs for the WHOLE hold (0.9s, linear) so the pill reaches
-           full gold exactly as the gate fires. Releasing early then reads as an
-           interrupted fill, not a completed one that mysteriously did nothing.
-           The 0.42s cubic-bezier is restored on release, so the retract is
-           snappy. */
-        transition: background-size 0.9s linear, color 0.2s ease,
-          border-color 0.2s ease, background-color 0.2s ease,
-          transform 0.12s ease, opacity 0.6s ease, visibility 0.6s ease;
+        /* The glow warms over the whole hold (linear), matching the crest's
+           travel; the other properties stay snappy. */
+        transition: color 0.2s ease, border-color 0.2s ease,
+          background-color 0.2s ease, transform 0.16s var(--ic-ease),
+          box-shadow 0.9s linear;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+          0 10px 32px -6px color-mix(in srgb, var(--accent-text) 70%, transparent);
+      }
+      /* A pointer hold presses the pill in; keyboard holds do not (there is no
+         pointer to press with). */
+      .intro-continue.is-holding.is-pointer {
+        transform: translateX(-50%) scale(0.97);
+      }
+      /* On completion: a single gold pulse ring, then the cover lifts. */
+      .intro-continue .intro-continue-pulse {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        opacity: 0;
+      }
+      .intro-continue.is-done .intro-continue-pulse {
+        animation: intro-continue-pulse 600ms var(--ic-ease) forwards;
+      }
+      @keyframes intro-continue-pulse {
+        from { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-text) 55%, transparent); }
+        to   { opacity: 0; box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent-text) 0%, transparent); }
       }
       /* A short press (below the hold threshold) shows the pill press down a
          hair, then snap back — visible feedback for a tap that does NOT exit,
@@ -2409,18 +2497,26 @@
           transition: none;
         }
         /* No motion at all: the hold gate is bypassed under reduced motion
-           (see the JS), so a plain press / click exits. Cancel the fill and the
-           nudge so a tap cannot animate anything; keep a static ink/gold press
-           so the feedback survives without motion. */
+           (see the JS), so a plain press / click exits. Cancel the fill, the
+           crest and the nudge so a tap cannot animate anything; keep a static
+           ink/gold press so the feedback survives without motion. */
         .intro-continue:active,
         .intro-continue.is-nudge {
           transform: translateX(-50%);
+          background-color: var(--accent-text);
           color: var(--accent-ink);
           border-color: var(--accent-text);
         }
+        .intro-continue .intro-continue-fill,
+        .intro-continue .intro-continue-crest,
+        .intro-continue .intro-continue-label--fill {
+          display: none;
+        }
         .intro-continue.is-holding {
-          background-size: 0% 100%;
           background-color: transparent;
+        }
+        .intro-continue .intro-continue-pulse {
+          animation: none !important;
         }
       }
       .intro-continue.is-gone {
@@ -3914,8 +4010,25 @@
          would silence a focusable button for assistive tech; the teardown
          removes it with the stage (dismiss() → removeNow()). -->
     <button class="intro-continue" id="introContinueBtn" type="button">
-      Continue to the archive
-      <span class="intro-continue-arrow" aria-hidden="true">→</span>
+      <span class="intro-continue-pulse" aria-hidden="true"></span>
+      <span class="intro-continue-label">
+        Continue to the archive
+        <span class="intro-continue-arrow" aria-hidden="true">→</span>
+      </span>
+      <span class="intro-continue-clip" aria-hidden="true">
+        <span class="intro-continue-fill">
+          <span class="intro-continue-label intro-continue-label--fill">
+            Continue to the archive
+            <span class="intro-continue-arrow">→</span>
+          </span>
+        </span>
+        <span class="intro-continue-crest">
+          <span class="intro-continue-label intro-continue-label--fill">
+            Continue to the archive
+            <span class="intro-continue-arrow">→</span>
+          </span>
+        </span>
+      </span>
     </button>
     <div class="intro-stage" id="introStage" aria-hidden="true">
 
@@ -7270,16 +7383,25 @@
              only create it as a sloppy-mode global, and a keypress during the
              entrance would read an undeclared name and throw a ReferenceError. */
           let continueReady = false;
-          /* Hold-to-confirm state (pointer / touch). A press must be HELD for
-             HOLD_MS before the cover lifts, so a stray tap on a phone cannot
-             skip the reveal. `holdTimer` is the pending release; `holding` is
-             true between pointerdown and pointerup; `nudgeTimer` clears the
-             short-press nudge. The keyboard exit is deliberately NOT gated by
+          /* Hold-to-confirm state (pointer / touch), ported from the HoldButton
+             reference. A press must be HELD for HOLD_MS before the cover lifts,
+             so a stray tap on a phone cannot skip the reveal. `holdTimer` is the
+             completion deadline; `holding` is true between pointerdown and
+             pointerup; `nudgeTimer` clears the short-press nudge; `gesture`
+             records the pointer's start time and box (for the drift check);
+             `motion` is the rAF that drives --ic-p 0..1; `pulseTimer` clears the
+             completion pulse. The keyboard exit is deliberately NOT gated by
              these — see onIntroKey(). */
           var HOLD_MS = 900;
+          var RELEASE_MS = 240;      /* the early-release retract duration */
+          var TAP_MS = 250;          /* a release under this reads as a tap */
+          var HIT_PAD = 10;          /* how far past the box a pointer may drift */
           var holdTimer = 0;
           var holding = false;
           var nudgeTimer = 0;
+          var pulseTimer = 0;
+          var gesture = { id: null, start: 0, rect: null };
+          var motion = { raf: 0, p: 0, from: 0, to: 0, start: 0 };
           /* The entrance's shared state. `tl` / `backstopId` are the animation
              handles `dismiss()` must be able to kill; `closed` is set the
              moment a dismissal begins, so a late timer can tell "user already
@@ -7562,23 +7684,96 @@
              is wired to the hand-off, not to onSkip. Registered here so the
              listener exists for the whole entrance; it is a no-op until the
              plates have settled (continueReady). */
-          /* Hold-to-confirm on the pointer path. A press arms a HOLD_MS fill
-             (.is-holding); if the hold completes, enterPage() fires. Releasing
-             early retracts the fill and shows a short nudge, and the trailing
-             click is ignored, so a stray tap can no longer skip the reveal.
-             Under reduced motion there is NO hold — a plain press exits at
-             once — and the keyboard exit (Space / Enter, detail === 0) stays
-             instant, so nobody is forced to hold. */
+          /* Hold-to-confirm on the pointer path, ported from the HoldButton
+             reference: a press arms a rAF that drives --ic-p 0..1 over HOLD_MS,
+             the gold crest wiping in behind the label; reach 1 and the gate
+             fires. Releasing early retracts the fill, shows a short nudge, and
+             the trailing click is ignored, so a stray tap can no longer skip
+             the reveal. The pointer is captured, so a drift outside the pill
+             cancels cleanly instead of stranding the fill. Under reduced motion
+             there is NO hold — a plain press exits at once — and the keyboard
+             exit (Space / Enter, detail === 0) stays instant, so nobody is
+             forced to hold. */
           if (continueBtn) {
-            var cancelHold = function (showNudge) {
-              if (holdTimer) {
-                clearTimeout(holdTimer);
-                holdTimer = 0;
-              }
+            var LINEAR = function (t) { return t; };
+            var EASE_OUT = function (t) { return 1 - Math.pow(1 - t, 3); };
+
+            /* The one writer of --ic-p. Cancels any prior frame so a press can
+               never race a retract. */
+            var drive = function (to, duration, ease, onDone) {
+              cancelAnimationFrame(motion.raf);
+              motion.from = motion.p;
+              motion.to = to;
+              motion.start = performance.now();
+              var step = function (now) {
+                var t = duration > 0 ? Math.min(1, (now - motion.start) / duration) : 1;
+                motion.p = motion.from + (motion.to - motion.from) * ease(t);
+                continueBtn.style.setProperty("--ic-p", motion.p.toFixed(4));
+                if (t < 1) { motion.raf = requestAnimationFrame(step); return; }
+                motion.raf = 0;
+                if (onDone) onDone();
+              };
+              motion.raf = requestAnimationFrame(step);
+            };
+
+            /* Measure the pill so the crest mask can size and travel to the real
+               box (the reference's ResizeObserver, done once per press). */
+            var measure = function () {
+              continueBtn.style.setProperty("--ic-w", continueBtn.offsetWidth + "px");
+              continueBtn.style.setProperty("--ic-h", continueBtn.offsetHeight + "px");
+            };
+
+            var clearTimers = function () {
+              if (holdTimer) { clearTimeout(holdTimer); holdTimer = 0; }
+              if (pulseTimer) { clearTimeout(pulseTimer); pulseTimer = 0; }
+            };
+
+            /* The gate: the crest reached the far edge. */
+            var complete = function () {
               if (!holding) return;
+              clearTimers();
               holding = false;
-              continueBtn.classList.remove("is-holding");
-              if (showNudge && !REDUCED) {
+              gesture.id = null;
+              continueBtn.classList.remove("is-holding", "is-pointer");
+              /* A single gold pulse as the cover lifts; the fill stays at 1 so
+                 the pill reads gold while dismiss() fades it out. */
+              continueBtn.classList.add("is-done");
+              pulseTimer = setTimeout(function () {
+                pulseTimer = 0;
+                continueBtn.classList.remove("is-done");
+              }, 700);
+              enterPage();
+            };
+
+            var begin = function (kind) {
+              if (!continueReady || holding || REDUCED) return false;
+              if (document.hidden) return false;
+              holding = true;
+              clearTimers();
+              clearTimeout(nudgeTimer);
+              continueBtn.classList.remove("is-nudge", "is-done");
+              measure();
+              continueBtn.classList.add("is-holding");
+              if (kind === "pointer") continueBtn.classList.add("is-pointer");
+              gesture.start = performance.now();
+              gesture.rect = continueBtn.getBoundingClientRect();
+              motion.p = 0;
+              drive(1, HOLD_MS, LINEAR, complete);
+              /* A backstop in case rAF is throttled: still fires the gate. */
+              holdTimer = setTimeout(complete, HOLD_MS + 150);
+              return true;
+            };
+
+            var endHold = function (opts) {
+              var drifted = !!(opts && opts.drifted);
+              if (!holding) return;
+              clearTimers();
+              var held = performance.now() - gesture.start;
+              holding = false;
+              gesture.id = null;
+              continueBtn.classList.remove("is-holding", "is-pointer");
+              drive(0, RELEASE_MS, EASE_OUT);
+              if (!drifted && held < HOLD_MS) {
                 continueBtn.classList.add("is-nudge");
                 clearTimeout(nudgeTimer);
                 nudgeTimer = setTimeout(function () {
@@ -7586,30 +7781,58 @@
                 }, 220);
               }
             };
-            continueBtn.addEventListener("pointerdown", function (e) {
-              if (!continueReady || holding || REDUCED) return;
+
+            var onPointerDown = function (e) {
               if (e.pointerType === "mouse" && e.button !== 0) return;
-              holding = true;
-              clearTimeout(nudgeTimer);
-              continueBtn.classList.remove("is-nudge");
-              continueBtn.classList.add("is-holding");
-              holdTimer = setTimeout(function () {
-                holdTimer = 0;
-                holding = false;
-                /* Keep .is-holding so the fill stays gold through the exit;
-                   dismiss() fades the whole chip out. */
-                enterPage();
-              }, HOLD_MS);
-            });
-            continueBtn.addEventListener("pointerup", function () {
-              cancelHold(true);
-            });
-            continueBtn.addEventListener("pointercancel", function () {
-              cancelHold(false);
-            });
-            continueBtn.addEventListener("pointerleave", function () {
-              cancelHold(false);
-            });
+              if (!e.isPrimary || gesture.id !== null) return;
+              if (!begin("pointer")) return;
+              gesture.id = e.pointerId;
+              try { continueBtn.setPointerCapture(e.pointerId); } catch (err) {}
+            };
+            var endPointer = function (e, opts) {
+              if (gesture.id === null || e.pointerId !== gesture.id) return;
+              try {
+                if (continueBtn.hasPointerCapture(e.pointerId))
+                  continueBtn.releasePointerCapture(e.pointerId);
+              } catch (err) {}
+              endHold(opts);
+            };
+            var onPointerMove = function (e) {
+              if (e.pointerId !== gesture.id) return;
+              var r = gesture.rect;
+              if (!r) return;
+              var out =
+                e.clientX < r.left - HIT_PAD || e.clientX > r.right + HIT_PAD ||
+                e.clientY < r.top - HIT_PAD || e.clientY > r.bottom + HIT_PAD;
+              if (out) endPointer(e, { drifted: true });
+            };
+            var onPointerLeave = function (e) {
+              if (e.pointerType !== "touch") endPointer(e, { drifted: true });
+            };
+
+            continueBtn.addEventListener("pointerdown", onPointerDown);
+            continueBtn.addEventListener("pointermove", onPointerMove);
+            continueBtn.addEventListener("pointerup", function (e) { endPointer(e); });
+            continueBtn.addEventListener("pointercancel", function (e) { endPointer(e, { drifted: true }); });
+            continueBtn.addEventListener("lostpointercapture", function (e) { endPointer(e, { drifted: true }); });
+            continueBtn.addEventListener("pointerleave", onPointerLeave);
+            continueBtn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+            /* While a hold is live, a tab-away, a window blur or Escape must
+               cancel it — otherwise the fill would keep running unseen and could
+               fire the exit for a user who left. */
+            var onHoldKey = function (e) {
+              if (e.key === "Escape") endHold({ drifted: true });
+            };
+            var onHoldHide = function () { endHold({ drifted: true }); };
+            var onHoldVisibility = function () { if (document.hidden) endHold({ drifted: true }); };
+            window.addEventListener("blur", onHoldHide);
+            document.addEventListener("visibilitychange", onHoldVisibility);
+            window.addEventListener("keydown", onHoldKey, true);
+            /* Escape on the pill is also caught by onIntroKey's sibling window
+               listener above; it ignores every key but Space/Enter, so there is
+               no double-handling. */
+
             /* The click path: keyboard activation (detail === 0) and, under
                reduced motion, any press exit instantly. A pointer-derived click
                (detail > 0) is NOT an exit — the hold owns it — so a quick tap
