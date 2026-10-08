@@ -9467,6 +9467,7 @@
              opacity transition actually runs instead of being coalesced. */
           requestAnimationFrame(function () {
             if (overlay) overlay.classList.add("is-open");
+            playPaperFlip(0.8);
           });
           try {
             closeBtn.focus({ preventScroll: true });
@@ -9673,6 +9674,7 @@
           if (!actions || !actions[p.clip]) return;
           setPoseActive(i);
           playPose(p, true);
+          playPaperFlip(0.45);
         }
 
         /* ---- turning the figure -------------------------------------------
@@ -9685,6 +9687,83 @@
            something that drifts away at nine degrees a second while they look
            at it. */
         var DRAG_RAD_PER_PX = 0.0105;
+
+        /* ---- paper-flip sound --------------------------------------------
+           Murni Web Audio API — tanpa file audio eksternal. Menghasilkan
+           gesekan lembaran kertas buku yang dibalik (white noise buffer
+           satu-kali → bandpass sweep + lowpass sweep + gain envelope serangan-
+           peluruhan, ~200-300ms). Dipakai saat kostum/pose diganti dan saat
+           figur dibalik lewat drag, supaya tiap ganti terdengar seperti
+           membalik halaman buku.
+           ------------------------------------------------------------------- */
+        var __paper = null;
+        function paperCtx() {
+          if (__paper) return __paper;
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return null;
+          __paper = { ctx: new AC(), noise: null };
+          return __paper;
+        }
+        function paperNoise(p) {
+          if (p.noise) return p.noise;
+          var len = Math.floor(p.ctx.sampleRate * 2);
+          var buf = p.ctx.createBuffer(1, len, p.ctx.sampleRate);
+          var d = buf.getChannelData(0);
+          var last = 0;
+          for (var i = 0; i < len; i++) {
+            last = last * 0.7 + (Math.random() * 2 - 1) * 0.3;
+            d[i] = last;
+          }
+          p.noise = buf;
+          return buf;
+        }
+        function playPaperFlip(intensity) {
+          var p = paperCtx();
+          if (!p) return;
+          if (p.ctx.state === "suspended") p.ctx.resume();
+          var z = intensity == null ? 0.5 : Math.max(0, Math.min(1, intensity));
+          var dur = 0.2 + z * 0.1;
+
+          var src = p.ctx.createBufferSource();
+          src.buffer = paperNoise(p);
+          src.playbackRate.value = 0.9 + Math.random() * 0.2;
+          var totalLen = src.buffer.duration;
+          var off = Math.random() * (totalLen - dur);
+
+          var band = p.ctx.createBiquadFilter();
+          band.type = "bandpass";
+          band.frequency.setValueAtTime(2200 + z * 1400, p.ctx.currentTime);
+          band.frequency.exponentialRampToValueAtTime(700 + z * 400, p.ctx.currentTime + dur);
+          band.Q.value = 0.8 + z * 1.6;
+
+          var low = p.ctx.createBiquadFilter();
+          low.type = "lowpass";
+          low.frequency.setValueAtTime(5000, p.ctx.currentTime);
+          low.frequency.exponentialRampToValueAtTime(2400, p.ctx.currentTime + dur);
+          low.Q.value = 0.5;
+
+          var g = p.ctx.createGain();
+          var t0 = p.ctx.currentTime;
+          var peak = 0.18 + z * 0.22;
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(peak, t0 + dur * 0.15);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+          src.connect(band); band.connect(low); low.connect(g); g.connect(p.ctx.destination);
+          src.start(t0, off, dur);
+          src.onended = function () {
+            src.disconnect(); band.disconnect(); low.disconnect(); g.disconnect();
+          };
+        }
+        /* Throttle drag supaya suara tidak menumpuk saat drag cepat. */
+        var __paperLast = 0;
+        function playPaperFlipThrottled(intensity) {
+          var now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+          if (now - __paperLast < 110) return;
+          __paperLast = now;
+          playPaperFlip(intensity);
+        }
+
         function onDragDown(e) {
           if (!pivot || !overlay) return;
           if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -9709,6 +9788,8 @@
           pivot.rotation.y += dx * DRAG_RAD_PER_PX;
           drag.x = e.clientX;
           drag.y = e.clientY;
+          /* Geseran figur = geseran halaman: suara kertas halus, di-throttle. */
+          playPaperFlipThrottled(0.28);
           /* Under reduced motion there is no loop to repaint the turn. */
           drawOnce();
         }
@@ -9731,6 +9812,7 @@
           if (i === state.variant && modelRoot) return;
           if (!VARIANTS[i]) return;
           loadVariant(i);
+          playPaperFlip(0.7);
         }
 
         function loadVariant(i) {
@@ -9823,6 +9905,7 @@
           var gone = overlay;
           overlay = null;
           gone.classList.remove("is-open");
+          playPaperFlip(0.4);
           lockScroll(false);
           if (restoreFocus && restoreFocus.focus) {
             try {
