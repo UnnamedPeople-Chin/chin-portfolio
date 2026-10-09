@@ -4275,6 +4275,12 @@
           <div class="intro-plate intro-plate--clear" style="--i:0;--dir:-1;--y:36px">
             <img
               src="/chin-portfolio/aethercast.webp"
+              srcset="
+                /chin-portfolio/aethercast-480.webp  480w,
+                /chin-portfolio/aethercast-800.webp  800w,
+                /chin-portfolio/aethercast.webp     1280w
+              "
+              sizes="(max-width: 1000px) 45vw, 408px"
               alt=""
               width="440"
               height="248"
@@ -4284,6 +4290,12 @@
           <div class="intro-plate intro-plate--clear" style="--i:1;--dir:1;--y:18px">
             <img
               src="/chin-portfolio/starwars-ar.webp"
+              srcset="
+                /chin-portfolio/starwars-ar-480.webp  480w,
+                /chin-portfolio/starwars-ar-800.webp  800w,
+                /chin-portfolio/starwars-ar.webp     1280w
+              "
+              sizes="(max-width: 1000px) 45vw, 408px"
               alt=""
               width="440"
               height="248"
@@ -4293,6 +4305,12 @@
           <div class="intro-plate intro-plate--clear" style="--i:2;--dir:-1;--y:0px">
             <img
               src="/chin-portfolio/moneyflow.webp"
+              srcset="
+                /chin-portfolio/moneyflow-480.webp  480w,
+                /chin-portfolio/moneyflow-800.webp  800w,
+                /chin-portfolio/moneyflow.webp     1280w
+              "
+              sizes="(max-width: 1000px) 45vw, 408px"
               alt=""
               width="440"
               height="248"
@@ -4302,6 +4320,12 @@
           <div class="intro-plate intro-plate--clear" style="--i:3;--dir:1;--y:18px">
             <img
               src="/chin-portfolio/schedule-organizer.webp"
+              srcset="
+                /chin-portfolio/schedule-organizer-480.webp  480w,
+                /chin-portfolio/schedule-organizer-800.webp  800w,
+                /chin-portfolio/schedule-organizer.webp     1280w
+              "
+              sizes="(max-width: 1000px) 45vw, 408px"
               alt=""
               width="440"
               height="248"
@@ -5228,6 +5252,25 @@
           },
         ];
         PAGES.forEach((p) => (p.url = DIR + p.file));
+        /* Two smaller faces per spread, chosen so a reader never pays for
+           pixels they cannot see:
+             thumb  the plate hover-card, a ~230px box → 480w (20 KB, not 143).
+             book   the sketchbook leaf. On a phone the book is ~390px wide
+                    (~780 device px at dpr 2), so 800w is a 1:1 fit and the
+                    1280w sheet is a 3× oversample; on desktop the leaf runs up
+                    to 900px and keeps the full sheet. portrait-intro has no
+                    small variants (it is already ~100 KB) and keeps its url. */
+        const BOOK_SMALL = matchMedia("(max-width: 640px)").matches;
+        PAGES.forEach((p) => {
+          const small = /^(aethercast|starwars-ar|moneyflow|schedule-organizer)\.webp$/.test(
+            p.file,
+          );
+          p.thumb = small ? DIR + p.file.replace(/\.webp$/, "-480.webp") : p.url;
+          p.book =
+            small && BOOK_SMALL
+              ? DIR + p.file.replace(/\.webp$/, "-800.webp")
+              : p.url;
+        });
         const M = PAGES.length,
           LAND = 0;
 
@@ -5332,7 +5375,7 @@
               : PAGES[i]
                 ? PAGES[i].title
                 : "";
-          im.src = PAGES[i].url;
+          im.src = PAGES[i].book;
           return im;
         }
 
@@ -5377,8 +5420,8 @@
               e.style.backgroundImage = "url(" + url + ")";
               e.style.backgroundPositionX = px;
             };
-            dress(f, PAGES[from].url, dir === "next" ? A : B);
-            dress(b, PAGES[to].url, dir === "next" ? B : A);
+            dress(f, PAGES[from].book, dir === "next" ? A : B);
+            dress(b, PAGES[to].book, dir === "next" ? B : A);
             f.appendChild(el("div", "sh"));
             f.appendChild(el("div", "gl"));
             b.appendChild(el("div", "sh"));
@@ -5421,7 +5464,7 @@
           if (!turn) {
             const f = el("div", "sb-full");
             const im = new Image();
-            im.src = PAGES[idx].url;
+            im.src = PAGES[idx].book;
             im.alt =
               PAGES[idx] && PAGES[idx].alt ? PAGES[idx].alt : PAGES[idx].title;
             im.draggable = false;
@@ -6954,7 +6997,7 @@
             '<div class="plate-card-box">' +
             '<div class="plate-card-thumb">' +
             '<img src="' +
-            p.url +
+            (p.thumb || p.url) +
             '" alt="' +
             (p.alt || p.title) +
             '" loading="lazy" />' +
@@ -7440,10 +7483,18 @@
           idx = Q.has("shot") ? (parseInt(Q.get("shot"), 10) || 0) % M : 0;
           paint();
           applyView();
+          /* The riffle plays on desktop only (startIntro() returns early on
+             ≤640px), so a phone never needs all five leaves decoded up front —
+             it would fetch five 1280w sheets it will not show. Desktop still
+             warms the whole set because the riffle turns through every spread;
+             mobile warms just the cover it lands on, and the rest arrive
+             lazily as the reader turns. Both read `p.book`, the leaf variant,
+             so a phone never pulls the 1280w sheet here either. */
+          const warm = BOOK_SMALL ? [PAGES[idx]] : PAGES;
           await Promise.all(
-            PAGES.map((p) => {
+            warm.map((p) => {
               const im = new Image();
-              im.src = p.url;
+              im.src = p.book;
               return im.decode
                 ? im.decode().catch(() => {})
                 : new Promise((r) => {
@@ -10458,17 +10509,18 @@
       <audio
         class="np-audio"
         src="/chin-portfolio/backsound.mp3"
-        preload="auto"
+        preload="none"
       ></audio>
     </div>
     <script>
       /* Backsound card: a local track (no token, no API, no expiry).
          Play/pause drives the disc spin and the equalizer; the mute button
          toggles sound; the loop button opts the track into repeat (it plays
-         once by default); the range scrubs. The track tries to start
-         the moment the page opens, and falls back to the first user
-         gesture (in practice the cover's Continue button) when the
-         browser refuses an unmuted autoplay. */
+         once by default); the range scrubs. The track starts on the first
+         user gesture (in practice the cover's Continue button) rather than
+         at load: the <audio> is preload="none" and nothing calls play()
+         until then, so a visit that never asks for sound never pays for the
+         1.15 MB mp3 — which was 43% of the cold-load bytes on a phone. */
       (function () {
         var card = document.querySelector(".np-card");
         if (!card) return;
@@ -10526,14 +10578,14 @@
           try { localStorage.setItem(LOOP_KEY, on ? "1" : "0"); } catch (e) {}
         });
 
-        /* ── Autoplay, with a one-shot gesture fallback ────────────────
-           play() is attempted immediately. A browser that refuses an
-           unmuted autoplay (NotAllowedError) leaves the unlock listeners
-           armed; the first gesture anywhere starts the track — except a
+        /* ── Autoplay, on the first user gesture ───────────────────────
+           The track is NOT started at load: preload="none" means the mp3 is
+           not fetched until play() is called, and play() is only called from
+           a real gesture. The first gesture anywhere starts it — except a
            gesture inside this card, which already IS a gesture, so the
-           card's own buttons handle it and the pre-kick must not eat
-           their click. Once playback has begun the listeners are removed
-           for good, so a later manual pause is never overridden. */
+           card's own buttons handle it and the pre-kick must not eat their
+           click. Once playback has begun the listeners are removed for good,
+           so a later manual pause is never overridden. */
         var started = false;
         var kick = function () {
           var p = audio.play();
@@ -10557,7 +10609,6 @@
         document.addEventListener("pointerdown", onFirst, true);
         document.addEventListener("keydown", onFirst, true);
         document.addEventListener("touchend", onFirst, true);
-        kick();
 
         /* ── Dodge the footer ─────────────────────────────────────────
            The card is fixed bottom-right, which puts it right on the
