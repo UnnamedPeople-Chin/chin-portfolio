@@ -258,6 +258,18 @@
         .has-accent-transition{transition:none}
       }
       *{box-sizing:border-box}
+      /* Kill the platform tap-highlight globally. Chrome/Android paints a
+         translucent BLUE (#33B5E5 at 40%) over whatever the finger lands on —
+         and over every tappable element the finger then drags across. On this
+         near-black plate that blue flash reads as a stray block rather than a
+         touch affordance, and it was leaking through the nav links, the
+         contact rows, the footer, the sketchbook tools, the loupe and the
+         whole backsound panel. The property inherits, so a single rule on the
+         root covers every element (verified: html + a + .np-card +
+         .contact-row + .foot-link + #loupeBtn + .np-range all compute to
+         rgba(0,0,0,0) from this one declaration). Controls that want a touch
+         cue paint their own :active state in gold. */
+      html{-webkit-tap-highlight-color:transparent}
       /* Visually hidden but exposed to assistive tech (page-title h1). */
       .sr-only{
         position:absolute;width:1px;height:1px;padding:0;margin:-1px;
@@ -304,6 +316,43 @@
       a{color:inherit;text-decoration:none}
       button{font:inherit}
       ::selection{background:rgba(198,160,83,.85);color:#10172B}
+      /* Stop the chrome from being text-selected on touch. A press-and-drag
+         across the nav, the carousel, the sketchbook controls, the player or
+         the footer used to start a text selection whose handles and band then
+         sat over the page. These are controls and ornament, not prose — a
+         finger resting on them never means "select this". Prose and data that
+         a visitor might legitimately copy stay selectable: the email address
+         and the body copy re-enable it explicitly below. */
+      .top,
+      .top *,
+      #bcWrap,
+      #bcWrap *,
+      .sb-tools,
+      .sb-tools *,
+      .sb-arrow,
+      .hero-down,
+      .eyt,
+      .eyt *,
+      .contact-row,
+      .contact-row *,
+      .np-card,
+      .np-card *,
+      .site-foot .foot-link,
+      .site-foot .foot-top,
+      .skip-link,
+      .intro-stage,
+      .intro-stage * {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        user-select: none;
+      }
+      /* …except the things worth copying: the mailto address in the contact
+         rows stays selectable so a visitor can copy it. */
+      .contact-cv {
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        user-select: text;
+      }
 
       /* the painted ground the whole page sits on. The old cream watercolour
          is inverted and dimmed so it reads as faint mottling in the plate
