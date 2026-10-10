@@ -22,9 +22,9 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#ece7dc",
-  "background_color": "#ece7dc",
-  "display": "browser",
-  "start_url": "/landing-pages/chin-portfolio.html",
+  "theme_color": "#0B1120",
+  "background_color": "#0B1120",
+  "display": "standalone",
+  "start_url": "/",
   "scope": "/"
 }

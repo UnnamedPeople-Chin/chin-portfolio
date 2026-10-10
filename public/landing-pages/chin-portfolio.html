@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Chin Portfolio · Jizdan YR</title>
+    <title>Jizdan YR — Full-Stack Developer &amp; AI Engineer</title>
     <meta
       name="description"
       content="Full-Stack Developer, AI Engineer &amp; Frontend Developer · Politeknik Negeri Semarang"
@@ -149,9 +149,25 @@
       var failSafe = function () {
         if (document.body && document.body.dataset.ready !== "1") {
           document.documentElement.classList.add("js-failed");
+          /* `js-failed`'s CSS only un-hides the content; it does not lift the
+             scroll lock or the focus trap the entrance arms when it starts.
+             A visitor whose fonts or first spread are slow would therefore land
+             on a page that is visible but cannot be scrolled or tabbed through.
+             Ask the entrance to drop itself outright (its own release() path);
+             guarded, because on an early error the entrance block has not run
+             yet and there is nothing to dismiss. */
+          if (typeof window.__introFailSafe === "function") {
+            try { window.__introFailSafe(); } catch (e) {}
+          }
         }
       };
       window.addEventListener("error", failSafe, { once: true });
+      /* A rejected promise never fires `error` — it fires `unhandledrejection`.
+         The page's own boot, the model loader and the ogl carousel are all
+         promise chains, so a rejection there would strand the cover exactly the
+         way a thrown error would, but the `error` listener above would never
+         see it. Same guard, same one-shot. */
+      window.addEventListener("unhandledrejection", failSafe, { once: true });
       /* Watchdog: `boot()` sets body[data-ready=1] once fonts and the first spread
    have decoded. If that has not happened well after the entrance overlay would
    have auto-hidden (1.7s), something is stuck — show the content anyway. */
@@ -213,6 +229,11 @@
         --ground:#0B1120;
         --surface:#1A2340;
         --surface-mid:#141C33;
+        /* The plate's hover/active fill. It is a third, lighter step above
+           --surface (the plate lifts toward the light rather than swapping to a
+           grey), so it gets its own token instead of being retyped as #222C4E
+           in four places. */
+        --surface-hover:#222C4E;
         --paper:#0B1120; /* kept as an alias: JS reads --paper for DESK */
         --ink:#EFE7D6;
         --ink-soft:rgba(239,231,214,.60);
@@ -228,8 +249,11 @@
            is real text must clear 4.5:1, so every small-text use points at the
            *-text tokens at .74 (8.64:1 on --ground, 7.50:1 on --surface).
            NOTE: never use --ink-faint (.48) for text. */
+        /* Two names, one value: every small-text use points at .74 (see the
+           note above), so --ink-faint-text is kept only as an alias of
+           --ink-soft-text rather than a second literal that could drift. */
         --ink-soft-text:rgba(239,231,214,.74);
-        --ink-faint-text:rgba(239,231,214,.74);
+        --ink-faint-text:var(--ink-soft-text);
         --earth-text:#DDBE78;
         /* Per-project accent, defaulting to the gold pair so a page that
            never sets them (or a browser without @property) looks exactly as
@@ -241,6 +265,14 @@
         --font:'Switzer',"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
         --track-caps:.24em;
         --track-nav:.06em;
+        /* The three easing curves the page actually reuses, named once. They
+           were retyped as bare literals ~27 times (and in two spellings each),
+           so a tweak to one meant hunting every copy and the file drifted
+           between `.4,0,.2,1` and `0.4, 0, 0.2, 1`. Tokens collapse that to
+           one edit and one spelling. */
+        --ease-out:cubic-bezier(.25,.46,.45,.94);
+        --ease-soft:cubic-bezier(.22,.61,.36,1);
+        --ease-std:cubic-bezier(.4,0,.2,1);
         /* The deckled edge of the plate sheet, as an alpha mask. GENERATED —
            never hand-edited. See tools/gen-deckle-mask.mjs, which rewrites
            this one line and nothing else. 1000x2000, bottom edge ragged by
@@ -417,11 +449,14 @@
         font-family:var(--display);font-size:clamp(24px,2.4vw,30px);letter-spacing:.01em;
         white-space:nowrap;line-height:1;
       }
-      /* The wordmark is only 20-30px tall and sits at the very top of the
-         fixed bar, so the only free space is above it. The hit box grows
-         13px up (to the viewport edge) and 16px sideways; it does not grow
-         down, because the nav row is directly beneath and owns that band. */
-      .top .name::after{content:"";position:absolute;left:-16px;right:-16px;top:-13px;bottom:0}
+      /* The wordmark is only 19-30px tall and sits at the very top of the
+         fixed bar. Its hit box grows 13px up (to the viewport edge), 16px
+         sideways, and 13px down into the free band above the nav row, so the
+         target clears the 44px minimum on phones without moving the type
+         (19 + 13 + 13 = 45px at the narrowest width). Where the grown box
+         would meet a nav link's own hit box, the nav — later in the DOM —
+         takes the pointer, so neither target is ambiguous. */
+      .top .name::after{content:"";position:absolute;left:-16px;right:-16px;top:-13px;bottom:-13px}
       .top nav{
         display:flex;gap:clamp(14px,2vw,26px);font-size:15px;align-items:center;
         letter-spacing:var(--track-nav);font-weight:300;
@@ -430,7 +465,15 @@
         position:relative;
         display:inline-flex;align-items:center;gap:.5em;
         color:var(--ink-soft-text);
-        padding-bottom:3px;
+        /* WCAG 2.5.5: the link's own box must clear 44px on phones. The line
+           box is `line-height:normal` — ~13.8px at 12px type, ~15px at 13px —
+           so 15.5px of transparent padding above and below takes the box to
+           44.8px at the narrowest width (and ~46px at 390px). The equal
+           negative margin cancels that padding in layout, so the nav row keeps
+           its exact height and the type does not move. (13px was not enough:
+           it assumed an 18px line and measured 40px.) */
+        padding-block:15.5px;
+        margin-block:-15.5px;
         transition:color .25s ease;
       }
       /* ---- Accession index ----
@@ -469,7 +512,7 @@
       }
       .top nav > a .nav-mask span{
         display:block;
-        transition:transform .42s cubic-bezier(.4,0,.2,1);
+        transition:transform .42s var(--ease-std);
       }
       /* Copy 1 rises out of the box, copy 2 rises into it — both travel exactly
          one line, so the swap reads as one printed word turning over. The
@@ -483,19 +526,14 @@
       .top nav > a:focus-visible .nav-mask .is-2{
         transform:translateY(0);
       }
-      /* Tap-target expansion via a pseudo-element, so the 15px link text and
-         its 3px underline keep their exact metrics. The links are flex items
-         whose line box is only 16px tall, so the hit box grows vertically to
-         44px and 2.5px sideways (enough to lift "About" at 39.9px past 44px),
-         while the 11px gap between links still absorbs the 5px of shared
-         growth without the neighbours' boxes touching.
-
-         The growth is biased downward on purpose. The wordmark sits directly
-         above, only 9px away, so the top edge stops 8px up to leave the
-         wordmark's own band intact; the missing height is taken from the
-         empty 50px header padding below the row, which no other control
-         claims. Growing upward instead would overlap the wordmark and send
-         taps on the bottom of "Jizdan YR" to "Contact". */
+      /* Tap-target expansion: the link itself now carries 13px of transparent
+         padding-block (cancelled by an equal negative margin, so the row keeps
+         its metrics), which makes the link's OWN box 44px tall — the honest
+         hit area a hit-test reports, not a pseudo-element it cannot see. The
+         pseudo below only widens the box 2.5px sideways (enough to lift
+         "About" at 39.9px past 44px); the 11px gap between links still absorbs
+         that shared growth without the neighbours' boxes touching.
+      */
       /* Scoped to DIRECT nav children. The social icons live inside
          `.top-socials` (a div nested in this same <nav>), so a bare
          `.top nav a` selector also matched them — the earth underline and the
@@ -505,19 +543,22 @@
       .top nav > a::before{
         content:"";
         position:absolute;
-        left:-2.5px;right:-2.5px;top:-8px;bottom:-20px;
+        left:-2.5px;right:-2.5px;top:0;bottom:0;
       }
       .top nav > a::after{
         content:"";
         position:absolute;
         left:0;
-        bottom:0;
+        /* `bottom:10px` restores the underline to its old 3px-below-the-text
+           resting place: the link now carries 13px of transparent bottom
+           padding (see above), so 13 - 3 = 10. */
+        bottom:10px;
         width:100%;
         height:1.5px;
         background:var(--earth);
         transform-origin:right center;
         transform:scaleX(0);
-        transition:transform .3s cubic-bezier(0.4,0,0.2,1);
+        transition:transform .3s var(--ease-std);
         pointer-events:none;
       }
       .top nav > a:hover,.top nav > a:focus-visible,.top nav > a[aria-current]{color:var(--ink)}
@@ -529,10 +570,18 @@
         display:flex;align-items:center;gap:13px;margin-left:2px;padding-left:clamp(12px,1.6vw,20px);
         border-left:1px solid var(--hairline);
       }
-      .icon-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:4px;color:var(--ink-soft);transition:color .2s}
-      /* 18x18 on phones, 24x23 on desktop. Grow only vertically: the gaps
-         between the four social icons are 9-13px, so widening the hit boxes
-         would make the boundary between two neighbours ambiguous. */
+      .icon-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:4px;
+        /* WCAG 2.5.5: the icon's own box must clear 44px. This is an
+           inline-flex of an SVG, so the box is exactly svg + 2*padding-block;
+           15.5px each side clears 44px for the 14px icon at ≤640px and the
+           13px icon at ≤360px (both 44px+). The equal negative margin cancels
+           it in layout, so the header row keeps its height. The ≤640px rule
+           below sets padding-INLINE only, so it cannot undo this. */
+        padding-block:15.5px;margin-block:-15.5px;
+        color:var(--ink-soft);transition:color .2s}
+      /* Belt for older engines: a wider invisible hit box on top of the box
+         above. Kept vertical-only — the four icons sit 9-13px apart, so a
+         horizontal widening would make a tap between two of them ambiguous. */
       .icon-btn::after{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px}
       .icon-btn:hover{color:var(--ink)}
       .top .icon-btn svg{width:16px;height:16px;display:block}
@@ -541,8 +590,21 @@
         .top .name{font-size:20px}
         .top nav{gap:11px;font-size:13px}
         .top nav .top-socials{gap:9px;padding-left:10px}
-        .top .icon-btn{padding:2px}
+        .top .icon-btn{padding-inline:2px}
         .top .icon-btn svg{width:14px;height:14px}
+      }
+      /* Very narrow phones (≤360px, incl. the 320px class): the ≤640px row
+         still overflows — at 320px the nav's right edge lands ~332px and the
+         outermost social icon is clipped off-screen, untappable. Tighten the
+         row so it fits with room to spare rather than letting it wrap: a
+         wrapped nav on a fixed header would double the bar's height and push
+         the whole hero down. */
+      @media (max-width:360px){
+        .top{padding-inline:10px}
+        .top .name{font-size:19px}
+        .top nav{gap:7px;font-size:12px}
+        .top nav .top-socials{gap:7px;padding-left:7px}
+        .top .icon-btn svg{width:13px;height:13px}
       }
 
       /* ---------------- hero ---------------- */
@@ -884,6 +946,11 @@
                           #6d5222 62% 92%,#9a7b3e80 92% 100%);
         box-shadow:0 8px 15px rgba(2,5,14,.45),0 18px 26px rgba(2,5,14,.28);
       }
+      /* The handle is ~34px thick at the default loupe size — a grabbable
+         strip, but under the 44px minimum for a touch target. Grow only its
+         hit box, 6px on every side (it is a rotated strip, so the box grows in
+         the handle's own axes), to clear 44px; the wood stays the same size. */
+      .loupe .grip::after{content:"";position:absolute;inset:-6px}
       .lens{
         position:relative;display:block;width:100%;height:100%;border-radius:50%;
         background-repeat:no-repeat;overflow:hidden;
@@ -956,7 +1023,6 @@
         animation:sb-cap-in .5s ease both}
       .sb-caption.live{animation:none}
       @keyframes sb-cap-in{0%{opacity:0}}
-      @keyframes sb-cap-out{to{opacity:0}}
       .sb-hint{
         margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint-text);
         transition:opacity .4s ease;
@@ -965,7 +1031,6 @@
       .sb-wrap.intro .sb-full img,.sb-wrap.intro .sb-half-img{filter:url(#sb-mblur-1)}
       .sb-wrap.intro.b2 .sb-full img,.sb-wrap.intro.b2 .sb-half-img{filter:url(#sb-mblur-2)}
       .sb-wrap.intro .sb-caption{animation:none}
-      .sb-wrap.intro .sb-caption.cap-out{display:none}
       @media (max-width:640px){
         .hero{
           padding:clamp(86px,10svh,104px) 0 clamp(44px,7svh,64px);
@@ -1047,7 +1112,7 @@
         mix-blend-mode:screen;
       }
       .js .section-block.sweep .light-sweep::before{
-        animation:light-sweep 1.15s cubic-bezier(.4,0,.2,1) forwards;
+        animation:light-sweep 1.15s var(--ease-std) forwards;
       }
       @keyframes light-sweep{
         0%{opacity:0;transform:translateX(-60%)}
@@ -1111,7 +1176,7 @@
         background:var(--earth);
         transform-origin:right center;
         transform:scaleX(0);
-        transition:transform .32s cubic-bezier(0.4,0,0.2,1);
+        transition:transform .32s var(--ease-std);
         pointer-events:none;
       }
       .bio-link:hover,.bio-link:focus-visible{color:var(--earth-text)}
@@ -1129,7 +1194,7 @@
         vertical-align:0.08em;
         opacity:0.5;
         color:var(--earth);
-        transition:transform .24s cubic-bezier(0.4,0,0.2,1), opacity .24s ease, color .24s ease;
+        transition:transform .24s var(--ease-std), opacity .24s ease, color .24s ease;
         pointer-events:none;
         flex-shrink:0;
       }
@@ -1231,8 +1296,8 @@
       /* Text elements: fade + slide up */
       .js .scroll-reveal-text {
         transform: translateY(30px);
-        transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                    transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        transition: opacity 0.8s var(--ease-out),
+                    transform 0.8s var(--ease-out);
       }
 
       /* Flower illustration: float in from right with rotation.
@@ -1246,32 +1311,14 @@
         --bloom-y: 0px;
         translate: 0 var(--bloom-y);
         transform: translateX(40px) rotate(-3deg);
-        transition: opacity 1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                    transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        transition: opacity 1s var(--ease-out),
+                    transform 1s var(--ease-out);
       }
 
       /* Ornament plates drift up slightly as their section arrives.  The
          revealed rule must out-specify the generic
          `.scroll-reveal.is-visible{opacity:1}` (0,2,0) or the plate snaps to
-         full opacity and loses its dimmed value — and it must re-assert
-         `transform`, since `.js .orn.scroll-reveal-orn` (0,3,0) would
-         otherwise pin the plate at its resting offset forever. */
-      .js .orn.scroll-reveal-orn {
-        transform: translateY(26px);
-        transition: opacity 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                    transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      }
-      .orn.scroll-reveal-orn.is-visible {
-        opacity: var(--o, .18); transform: none;
-      }
-
-      /* Brush strokes: scale from center */
-      .js .scroll-reveal-rule {
-        transform: scaleX(0);
-        transform-origin: center;
-        transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                    transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      }
+         full opacity and loses its dimmed value. */
 
       /* Revealed state */
       .scroll-reveal.is-visible {
@@ -1294,9 +1341,9 @@
         --wipe:-30%;
         -webkit-mask-image:linear-gradient(100deg,#000 calc(var(--wipe) - 30%),transparent var(--wipe));
                 mask-image:linear-gradient(100deg,#000 calc(var(--wipe) - 30%),transparent var(--wipe));
-        transition:--wipe .9s cubic-bezier(.4,0,.2,1),
-                   opacity .8s cubic-bezier(.25,.46,.45,.94),
-                   transform .8s cubic-bezier(.25,.46,.45,.94);
+        transition:--wipe .9s var(--ease-std),
+                   opacity .8s var(--ease-out),
+                   transform .8s var(--ease-out);
       }
       .js .scroll-reveal.reveal-wipe.is-visible{ --wipe:130%; }
 
@@ -1382,7 +1429,7 @@
            which read as a stray outline on an otherwise clean cloud. */
         .plate:hover,
         .plate:focus-visible {
-          background: #222C4E;
+          background: var(--surface-hover);
           border-color: var(--accent, var(--earth));
           box-shadow: 0 6px 20px rgba(2, 5, 14, 0.5);
         }
@@ -1400,10 +1447,6 @@
           font-weight: 600;
           margin-right: 1px;
           opacity: 0.85;
-        }
-        .plate-proj-title,
-        .plate-proj-stack {
-          display: none; /* hidden in desktop tag, displayed in hover card */
         }
 
         /* Proximity lens (fisheye): JS drives --proximity-scale and
@@ -1427,8 +1470,8 @@
         .plate-float-wrap {
           scale: var(--proximity-scale, 1) !important;
           translate: var(--push-x, 0px) var(--push-y, 0px) !important;
-          transition: scale 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                      translate 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          transition: scale 0.16s var(--ease-out),
+                      translate 0.16s var(--ease-out);
         }
 
         /* Tooltip: HIDDEN per user request */
@@ -1448,20 +1491,6 @@
           position: absolute;
           pointer-events: none;
           will-change: transform, opacity;
-        }
-
-        /* ---- Parallax Ready Elements ---- */
-        .parallax-slow {
-          will-change: transform;
-        }
-        .parallax-slower {
-          will-change: transform;
-        }
-
-        /* ---- Magnetic Cards (hover effect) ---- */
-        .magnetic-card {
-          will-change: transform;
-          transition: transform 0.05s ease-out;
         }
 
         /* ---- 3D Tilt Cards ---- */
@@ -1525,7 +1554,7 @@
         /* Card Box (solid warm paper, z-index elevated) */
         .plate-card-box {
           width: clamp(210px, 20vw, 250px);
-          background: #1A2340;
+          background: var(--surface);
           border: 2px solid rgba(239, 231, 214, 0.18);
           border-radius: 12px;
           padding: 10px;
@@ -1546,7 +1575,7 @@
           aspect-ratio: 16 / 9;
           border-radius: 7px;
           overflow: hidden;
-          background: #141C33;
+          background: var(--surface-mid);
           border: 1px solid rgba(239, 231, 214, 0.08);
         }
         .plate-card-thumb img {
@@ -1678,7 +1707,7 @@
         /* No hover on touch: the press is the highlight. Keyboard focus still
            gets its ring from the global .plate:focus-visible outline below. */
         .plate:active {
-          background: #222C4E;
+          background: var(--surface-hover);
           border-color: var(--accent, var(--earth));
           box-shadow: 0 4px 14px rgba(2, 5, 14, 0.5);
           transform: rotate(var(--rot, 0deg)) scale(0.96);
@@ -1696,10 +1725,6 @@
           font-style: normal;
           font-weight: 600;
           margin-right: 2px;
-        }
-        .plate-proj-title,
-        .plate-proj-stack {
-          display: none !important;
         }
         .plate-reveal {
           display: none !important;
@@ -1899,7 +1924,13 @@
         touch-action:pan-y;
       }
       html.bc-webgl .bc-card{
-        visibility:hidden !important;
+        /* display:none, not visibility:hidden: the fan cards are absolutely
+           positioned and the right-most one overflows the viewport, so a
+           hidden-but-present card still widened the document (scrollWidth 514
+           vs 390 on a phone) and let the page be dragged sideways. Removing
+           them from layout is what actually takes them out. The card data was
+           already read into JS before this class lands, so nothing is lost. */
+        display:none !important;
         pointer-events:none !important;
       }
       html.bc-webgl .bc-wrap{
@@ -1979,16 +2010,13 @@
       @media(max-width:680px){
         .js .contact-list li.scroll-reveal{
           transform:translateY(38px);
-          transition:opacity .7s cubic-bezier(.25,.46,.45,.94),
-                     transform .7s cubic-bezier(.25,.46,.45,.94);
+          transition:opacity .7s var(--ease-out),
+                     transform .7s var(--ease-out);
         }
         .js .contact-list li.scroll-reveal.is-visible{
           opacity:1;transform:translateY(0);
         }
       }
-
-      .foot{font-size:11.5px;letter-spacing:var(--track-caps);text-transform:uppercase;
-        color:var(--ink-faint-text);text-align:center;margin-top:20px}
 
       /* =====================================================================
          Entrance: Five Plates -> Book Settle.
@@ -2202,9 +2230,7 @@
          Colour AND opacity, separately: the fade animates `stroke-opacity`
          only, so the gold rule keeps its own `stroke` and cannot dry cream. */
       .dry-8    { stroke: #EFE7D6; --dry-o: .08 }
-      .dry-12   { stroke: #EFE7D6; --dry-o: .12 }
       .dry-20   { stroke: #EFE7D6; --dry-o: .20 }
-      .dry-32   { stroke: #EFE7D6; --dry-o: .32 }
       .dry-gold { stroke: #C6A053; --dry-o: .55 }
 
       @keyframes cp-draw { to { stroke-dashoffset: .002 } }
@@ -2252,11 +2278,11 @@
       }
 
       .intro-stage.is-live .intro-plate {
-        animation: cp-plate 1400ms cubic-bezier(.22, .61, .36, 1) 900ms forwards;
+        animation: cp-plate 1400ms var(--ease-soft) 900ms forwards;
       }
       .intro-stage.is-live .intro-plate--clear {
         animation:
-          cp-plate 1400ms cubic-bezier(.22, .61, .36, 1) 900ms forwards,
+          cp-plate 1400ms var(--ease-soft) 900ms forwards,
           cp-plate-clear 400ms ease-in 2300ms forwards;
       }
       /* The held portrait: sits IN the fan's arc (--y:36px, mirroring i=0) so
@@ -2266,8 +2292,8 @@
          so the visitor sees the book travel up before the Continue appears. */
       .intro-stage.is-live .intro-plate--raise {
         animation:
-          cp-plate 1400ms cubic-bezier(.22, .61, .36, 1) 900ms forwards,
-          cp-plate-raise 660ms cubic-bezier(.22, .61, .36, 1) 2700ms forwards;
+          cp-plate 1400ms var(--ease-soft) 900ms forwards,
+          cp-plate-raise 660ms var(--ease-soft) 2700ms forwards;
       }
       @keyframes cp-plate {
         0%   { opacity: 0;
@@ -2394,7 +2420,7 @@
            is that shared moment (2490 desktop / 2080 mobile, matching
            .intro-signature's cp-stamp delay); --d is the per-glyph stagger
            baked into the SVG. Last glyph ends 3390 < the 3400 resolve. */
-        animation: cp-sig-draw var(--sig-dur, 480ms) cubic-bezier(.4, 0, .2, 1)
+        animation: cp-sig-draw var(--sig-dur, 480ms) var(--ease-std)
                    calc(var(--sig-base, 2490ms) + var(--d, 0ms)) forwards;
       }
       @keyframes cp-sig-draw { to { stroke-dashoffset: 0 } }
@@ -2577,7 +2603,14 @@
       .intro-continue:focus-visible {
         color: var(--ink);
         border-color: var(--accent-text);
-        outline: none;
+      }
+      /* Keyboard focus gets a real ring, not just the 1px border-colour change:
+         the pill sits on the dark cover, and a colour-only cue is easy to miss.
+         `outline` (not border) so it never reflows the pill mid-hold, matching
+         the .np-btn ring. */
+      .intro-continue:focus-visible {
+        outline: 2px solid var(--accent-text);
+        outline-offset: 3px;
       }
       .intro-continue:hover .intro-continue-arrow,
       .intro-continue:focus-visible .intro-continue-arrow {
@@ -2708,12 +2741,12 @@
 
         /* --- the plates: 560 + i*70, 1000ms; last (portrait) ends 1840 --- */
         .intro-stage.is-live .intro-plate{
-          animation:cp-plate 1000ms cubic-bezier(.22,.61,.36,1)
+          animation:cp-plate 1000ms var(--ease-soft)
                     calc(560ms + var(--i,0) * 70ms) forwards;
         }
         .intro-stage.is-live .intro-plate--clear{
           animation:
-            cp-plate 1000ms cubic-bezier(.22,.61,.36,1)
+            cp-plate 1000ms var(--ease-soft)
               calc(560ms + var(--i,0) * 70ms) forwards,
             cp-plate-clear 400ms ease-in 1840ms forwards;
         }
@@ -2722,9 +2755,9 @@
            660ms, landing 2900, well inside the 3600 resolve deadline. */
         .intro-stage.is-live .intro-plate--raise{
           animation:
-            cp-plate 1000ms cubic-bezier(.22,.61,.36,1)
+            cp-plate 1000ms var(--ease-soft)
               calc(560ms + var(--i,0) * 70ms) forwards,
-            cp-plate-raise 660ms cubic-bezier(.22,.61,.36,1) 2240ms forwards;
+            cp-plate-raise 660ms var(--ease-soft) 2240ms forwards;
         }
 
         /* --- the identity: 2010 + i*70, 480ms; last ends 2700 (2220+480) --- */
@@ -2795,7 +2828,7 @@
          number leaves the grown portrait short of the book by exactly that 8%. */
       .intro-stage.is-fitting .intro-plate--raise {
         opacity: 1 !important;
-        animation: cp-plate-straighten 700ms cubic-bezier(.22, .61, .36, 1) forwards;
+        animation: cp-plate-straighten 700ms var(--ease-soft) forwards;
         will-change: transform;
       }
       @keyframes cp-plate-straighten {
@@ -2822,7 +2855,7 @@
         opacity: 0;
         visibility: visible;
         pointer-events: none;
-        transition: opacity 440ms cubic-bezier(.4, 0, .2, 1);
+        transition: opacity 440ms var(--ease-std);
       }
 
       /* ---- the end state, declared -----------------------------------------
@@ -3143,6 +3176,11 @@
         }
         .foot-year,
         .foot-top{justify-self:start}
+        /* Clearance for the fixed backsound player: on phones it parks in the
+           bottom-right corner (~81px tall plus its 12px inset) directly over
+           the last footer row. Reserve that band so the final links and the
+           "Back to top" control are never sitting under the card. */
+        .site-foot{padding-bottom:clamp(104px,26vw,136px)}
       }
       @media (max-width:420px){
         .foot-kicker{font-size:11px;letter-spacing:.16em}
@@ -3172,11 +3210,6 @@
         padding: 20px;
       }
 
-      @keyframes pmFadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-
       .project-modal {
         position: relative;
         max-width: 700px;
@@ -3191,17 +3224,6 @@
         overflow: hidden;
         display: flex;
         flex-direction: column;
-      }
-
-      @keyframes pmSlideUp {
-        from {
-          opacity: 0;
-          transform: translateY(24px) scale(0.96);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
       }
 
       .modal-close {
@@ -3750,7 +3772,7 @@
         height:50px;
         margin:-25px 0 0 -25px;
         border-radius:50%;
-        background:repeating-radial-gradient(circle at 50% 50%,#05080f 0 1.4px,#141c33 1.4px 3px);
+        background:repeating-radial-gradient(circle at 50% 50%,#05080f 0 1.4px,var(--surface-mid) 1.4px 3px);
         box-shadow:inset 0 0 0 1px rgba(239,231,214,.12);
         animation:np-spin 3.6s linear infinite;
         animation-play-state:paused;
@@ -3850,6 +3872,7 @@
         margin-left:2px;
       }
       .np-btn{
+        position:relative;
         display:inline-flex;
         align-items:center;
         justify-content:center;
@@ -3863,6 +3886,18 @@
         cursor:pointer;
         transition:background .25s ease,color .25s ease,transform .25s ease;
       }
+      /* WCAG 2.5.5: the three action buttons are 28px (26px on phones) so the
+         meta row stays compact. Grow the hit box vertically only — widening it
+         would make the 2px gaps between neighbours ambiguous — so the target
+         clears 44px while the visible disc keeps its size. */
+      .np-btn::after{content:"";position:absolute;left:0;right:0;top:-8px;bottom:-8px}
+      /* All three action buttons carry `.np-btn`, so ONE hover rule covers
+         them (`.np-play:hover` below overrides to gold for the play disc). The
+         mute and loop buttons used to repeat this exact declaration as
+         `.np-mute:hover` / `.np-loop:hover`; both were dead weight, because
+         `.np-btn:hover` already matched them and the muted/looping states are
+         coloured by the higher-specificity `.np-card.is-muted .np-mute` /
+         `.np-card.is-looping .np-loop` rules. */
       .np-btn:hover{background:rgba(239,231,214,.12);color:var(--ink)}
       .np-btn:active{transform:scale(.92)}
       .np-btn:focus-visible{outline:2px solid var(--earth);outline-offset:2px}
@@ -3873,7 +3908,6 @@
       .np-card.is-muted .np-mute .np-ic-sound{display:none}
       .np-card.is-muted .np-mute .np-ic-mute{display:block}
       .np-card.is-muted .np-mute{color:var(--earth-text)}
-      .np-mute:hover{background:rgba(239,231,214,.12);color:var(--ink)}
       /* Loop toggle: off by default (the track plays once), so the resting
          icon is the struck-through arrows — the slash says "not looping"
          outright. Turning it on drops the slash and tints the plain arrows
@@ -3883,7 +3917,6 @@
       .np-card.is-looping .np-loop .np-ic-loop{display:block}
       .np-card.is-looping .np-loop .np-ic-once{display:none}
       .np-card.is-looping .np-loop{color:var(--earth-text)}
-      .np-loop:hover{background:rgba(239,231,214,.12);color:var(--ink)}
       .np-play .np-ic-pause{display:none}
       .np-card.is-playing .np-play .np-ic-play{display:none}
       .np-card.is-playing .np-play .np-ic-pause{display:block}
@@ -3903,8 +3936,12 @@
       .np-range{
         flex:1 1 auto;
         min-width:0;
-        height:14px;
-        margin:0;
+        /* A 44px-tall box with 15px of negative margin top and bottom: the
+           input's layout contribution stays 14px (the seek row keeps its
+           height), the 3px track and 10px thumb stay centred by the engine,
+           and the hit target is a full 44px instead of 14px. */
+        height:44px;
+        margin:-15px 0;
         padding:0;
         background:transparent;
         cursor:pointer;
@@ -5057,7 +5094,7 @@
       <div class="foot-inner">
         <div class="foot-masthead">
           <div class="foot-mark" aria-hidden="true">
-            <div class="eyt" role="img" aria-label="A pill with two square eyes that follows the cursor">
+            <div class="eyt">
               <svg class="eyt-ball" viewBox="0 0 100 100" fill="none">
                 <defs>
                   <clipPath id="eyt-clip">
@@ -5175,7 +5212,7 @@
         </div>
         <div class="modal-content">
           <div class="modal-header">
-            <h2 id="modalProjectTitle"></h2>
+            <h2 id="modalProjectTitle">Project details</h2>
             <p class="modal-tagline" id="modalProjectTagline"></p>
             <p class="modal-year" id="modalProjectYear" aria-hidden="true"></p>
           </div>
@@ -5210,6 +5247,10 @@
 
     <script>
       (function () {
+        /* --- scope: sketchbook hero ---
+           Its `tick(now)` (the page-turn spring rAF) is a different function
+           from the `tick(t)` in the Hasumi easter-egg IIFE (the three.js
+           render loop). Same name, unrelated bodies. */
         /* =====================================================================
    Meng To — sketchbook hero.
    Spreads are transparent PNGs of an open sketchbook generated with
@@ -5364,6 +5405,17 @@
           const e = document.createElement(t);
           if (c) e.className = c;
           return e;
+        }
+        /* Text-only span helper: `.textContent` instead of concatenating a
+           project field into innerHTML. The project titles/places come from
+           the (now inline) data object, so building markup from them is a
+           latent injection sink the moment a title ever contains `<`; setting
+           text is immune and equally short. */
+        function span(c, text) {
+          const s = document.createElement("span");
+          s.className = c;
+          s.textContent = text == null ? "" : String(text);
+          return s;
         }
         function imgEl(i, side) {
           const im = new Image();
@@ -6221,7 +6273,7 @@
           '<path d="M8 5.5v13l11-6.5z" />' +
           "</svg></span>";
 
-        let projectsData = {
+        const projectsData = {
           projects: [
             {
               id: "aethercast",
@@ -6318,21 +6370,15 @@
           ],
         };
 
-        (function loadProjectsData() {
-          /* `/data/projects.json` is the copy that actually ships (public/data
-             is copied to dist root). The old `/src/data/projects.json` fallback
-             was dead in production — `src/` is never copied to dist — so it only
-             ever bought a wasted request on the dev server. One path is enough;
-             the inlined `projectsData` above already covers a failed fetch. */
-          fetch("/data/projects.json")
-            .then((res) => (res.ok ? res.json() : Promise.reject()))
-            .then((data) => {
-              if (data && Array.isArray(data.projects)) {
-                projectsData = data;
-              }
-            })
-            .catch(() => {});
-        })();
+        /* The project list is inlined above as the single source of truth.
+           There used to be a `fetch("/data/projects.json")` here that replaced
+           `projectsData` with an identical copy shipped in public/data — two
+           copies of the same 3.9 KB that had to be kept in sync by hand, plus
+           a request + JSON parse on every load for data already in the
+           document. With no build step generating one from the other, the
+           safest single source is the inline object: it is guaranteed present
+           on first paint (no fetch waterfall, no FOUC of missing projects) and
+           it works with no network at all. The duplicate file is gone. */
 
         function getProjectForIndex(pIdx) {
           if (!projectsData || !projectsData.projects) return null;
@@ -6491,11 +6537,42 @@
           modalVideoFrame.appendChild(facade);
         }
 
+        /* The dialog's Tab trap keeps the keyboard in, but it does nothing for
+           a screen reader's virtual cursor, which can still roam the page
+           behind the backdrop. Mark the page's landmarks inert/aria-hidden
+           while the dialog is open and restore them on close. Guarded: on
+           browsers without `inert` the attribute is ignored (old behaviour),
+           and we only ever restore the exact nodes we changed, so an element
+           the intro trap still owns is left untouched. */
+        const MODAL_SIBLINGS = Array.prototype.slice.call(
+          document.querySelectorAll(
+            "main.page, header.top, footer.site-foot, .np-card, .scroll-progress-brush",
+          ),
+        );
+        let modalInerted = [];
+        function setModalBackgroundInert(on) {
+          if (on) {
+            modalInerted = [];
+            MODAL_SIBLINGS.forEach(function (n) {
+              if (n.hasAttribute("inert")) return; /* the intro trap owns it */
+              n.setAttribute("inert", "");
+              n.setAttribute("aria-hidden", "true");
+              modalInerted.push(n);
+            });
+          } else {
+            modalInerted.forEach(function (n) {
+              n.removeAttribute("inert");
+              n.removeAttribute("aria-hidden");
+            });
+            modalInerted = [];
+          }
+        }
+
         function openProjectModal(project) {
           if (!project || !modalBackdrop) return;
 
           // Populate content
-          modalTitle.textContent = project.title || "";
+          modalTitle.textContent = project.title || "Project details";
           modalTagline.textContent = project.tagline || "";
           modalDesc.textContent = project.description || "";
           modalImg.src = project.image || "";
@@ -6567,6 +6644,7 @@
           // Show backdrop immediately
           modalBackdrop.style.display = "flex";
           modalBackdrop.setAttribute("aria-hidden", "false");
+          setModalBackgroundInert(true);
           lockPageScroll(true);
           // Reset the card's own scroll to the top for each newly opened project.
           const modalScroll = modalBackdrop.querySelector(".modal-content");
@@ -6788,6 +6866,7 @@
                 modalBackdrop.style.display = "none";
                 modalBackdrop.setAttribute("aria-hidden", "true");
                 lockPageScroll(false);
+                setModalBackgroundInert(false);
                 gsap.set(modal, { rotation: 0, clearProps: "transform" });
               },
             });
@@ -6795,6 +6874,7 @@
             modalBackdrop.style.display = "none";
             modalBackdrop.setAttribute("aria-hidden", "true");
             lockPageScroll(false);
+            setModalBackgroundInert(false);
           }
         }
 
@@ -6957,20 +7037,19 @@
           b.type = "button";
           b.setAttribute("aria-label", `${tag.label}: ${p.title} (${p.place})`);
 
-          const slashFormatted = tag.label.startsWith("/")
-            ? '<span class="plate-tag-slash">/</span>' + tag.label.slice(1)
-            : tag.label;
-
-          b.innerHTML =
-            '<span class="plate-tag">' +
-            slashFormatted +
-            "</span>" +
-            '<span class="plate-proj-title">' +
-            p.title +
-            "</span>" +
-            '<span class="plate-proj-stack">' +
-            p.place +
-            "</span>";
+          /* Built as DOM, not concatenated HTML: tag.label, p.title and p.place
+             are data fields, and a `<` or a quote in any of them would have
+             been parsed as markup. `.textContent`/`createTextNode` make that
+             impossible. The `/` slash is its own span so it can keep the
+             accent colour. */
+          const tagSpan = el("span", "plate-tag");
+          if (tag.label.startsWith("/")) {
+            tagSpan.appendChild(span("plate-tag-slash", "/"));
+            tagSpan.appendChild(document.createTextNode(tag.label.slice(1)));
+          } else {
+            tagSpan.textContent = tag.label;
+          }
+          b.appendChild(tagSpan);
 
           const reveal = el("div", "plate-reveal");
           reveal.setAttribute("aria-hidden", "true");
@@ -6982,6 +7061,11 @@
           const dotX = isRight ? 2 : 50;
           const endX = isRight ? 50 : 2;
 
+          /* The connector SVG is author-drawn (pathD/dotX/endX are computed
+             from `side`, never from data), so it stays a small innerHTML
+             fragment. Everything that comes from the project record — image
+             src/alt, the kicker, tag, title, place — is built as DOM nodes so
+             a `<` or quote in any field is text, not markup. */
           reveal.innerHTML =
             '<svg class="plate-connector" viewBox="0 0 52 44" fill="none" aria-hidden="true">' +
             '<path class="plate-connector-line" d="' +
@@ -6993,33 +7077,40 @@
             '<circle class="plate-connector-dot" cx="' +
             endX +
             '" cy="22" r="2" />' +
-            "</svg>" +
-            '<div class="plate-card-box">' +
-            '<div class="plate-card-thumb">' +
-            '<img src="' +
-            (p.thumb || p.url) +
-            '" alt="' +
-            (p.alt || p.title) +
-            '" loading="lazy" />' +
-            "</div>" +
-            '<div class="plate-card-meta">' +
-            '<div class="plate-card-kicker-row">' +
-            '<span class="plate-card-kicker">Plate ' +
-            String(pIdx + 1).padStart(2, "0") +
-            "</span>" +
-            '<span class="plate-card-tag-pill">' +
-            tag.label +
-            "</span>" +
-            "</div>" +
-            '<h3 class="plate-card-title">' +
-            p.title +
-            "</h3>" +
-            '<p class="plate-card-stack">' +
-            p.place +
-            "</p>" +
-            '<span class="plate-card-action">View spread ↗</span>' +
-            "</div>" +
-            "</div>";
+            "</svg>";
+
+          const cardBox = el("div", "plate-card-box");
+          const cardThumb = el("div", "plate-card-thumb");
+          const cardImg = document.createElement("img");
+          cardImg.src = p.thumb || p.url;
+          cardImg.alt = p.alt || p.title;
+          cardImg.loading = "lazy";
+          cardThumb.appendChild(cardImg);
+          const cardMeta = el("div", "plate-card-meta");
+          const kickerRow = el("div", "plate-card-kicker-row");
+          kickerRow.appendChild(
+            span("plate-card-kicker", "Plate " + String(pIdx + 1).padStart(2, "0")),
+          );
+          kickerRow.appendChild(span("plate-card-tag-pill", tag.label));
+          cardMeta.appendChild(kickerRow);
+          /* A <p>, not an <h3>: this card lives inside `.plate-reveal`, which is
+             `aria-hidden="true"` — a decorative hover card. An h3 there still
+             lands in the document outline for crawlers, and because several
+             keyword tags map to the same spread it produced three identical
+             "AetherCast" headings. The button above already carries the real
+             accessible name, so the visual title needs no heading semantics. */
+          const cardTitle = document.createElement("p");
+          cardTitle.className = "plate-card-title";
+          cardTitle.textContent = p.title;
+          cardMeta.appendChild(cardTitle);
+          const cardStack = document.createElement("p");
+          cardStack.className = "plate-card-stack";
+          cardStack.textContent = p.place;
+          cardMeta.appendChild(cardStack);
+          cardMeta.appendChild(span("plate-card-action", "View spread ↗"));
+          cardBox.appendChild(cardThumb);
+          cardBox.appendChild(cardMeta);
+          reveal.appendChild(cardBox);
 
           const activate = () => {
             goTo(pIdx);
@@ -7041,13 +7132,10 @@
           };
 
           b.onclick = activate;
-          const cardBox = reveal.querySelector(".plate-card-box");
-          if (cardBox) {
-            cardBox.onclick = (e) => {
-              e.stopPropagation(); // prevent double trigger
-              activate();
-            };
-          }
+          cardBox.onclick = (e) => {
+            e.stopPropagation(); // prevent double trigger
+            activate();
+          };
 
           const onEnter = () => {
             if (matchMedia("(max-width: 640px)").matches || REDUCED) return;
@@ -7128,16 +7216,12 @@
           floatWrap.appendChild(b);
           floatWrap.appendChild(reveal);
 
-          // Add tooltip (Shopify-style card)
-          const tooltip = el("div", "plate-tooltip");
-          tooltip.innerHTML =
-            '<div class="plate-tooltip-title">' +
-            p.title +
-            "</div>" +
-            '<p class="plate-tooltip-desc">' +
-            p.place +
-            "</p>";
-          floatWrap.appendChild(tooltip);
+          /* The "Shopify-style" tooltip card that used to be built here was
+             hidden at every width by `.plate-tooltip{display:none!important}`
+             (its child classes had no CSS at all), so it was 3 dead nodes per
+             chip — 36 per load — plus the title/place text concatenated into
+             them. Removed rather than rebuilt: if the tooltip is ever wanted
+             back, build it then, alongside the CSS that shows it. */
 
           // Add particle container
           const particleContainer = el("div", "plate-particles");
@@ -7942,6 +8026,37 @@
             return;
           }
 
+          /* ---- crawlers and automated renderers -----------------------------
+             The cover is a fixed, opaque, full-viewport stage and main.page is
+             `inert` while it plays, so any client that renders the page WITHOUT
+             clicking Continue — Googlebot's rendered snapshot, a link-preview
+             bot, a screenshot or mobile-friendly tester, an accessibility-tree
+             extractor — sees an empty page even though the real text is in the
+             DOM. Googlebot does not press Continue, so the cover must never
+             gate it. Detect automation two ways (navigator.webdriver, which
+             headless browsers set, and the bot UA tokens) and take the same
+             instant, no-animation path the ?nointro override uses. Real
+             visitors match neither and still get the full entrance. */
+          var IS_BOT = false;
+          try {
+            IS_BOT = navigator.webdriver === true;
+          } catch (e) {
+            IS_BOT = false;
+          }
+          if (!IS_BOT) {
+            try {
+              IS_BOT = /bot|crawler|spider|crawl|slurp|bingpreview|facebookexternalhit|embedly|quora link preview|whatsapp|telegrambot|discordbot|google-inspectiontool|lighthouse|headlesschrome|prerender|screaming frog|semrush|ahrefs|petalbot|yandex|duckduckbot|baiduspider|applebot|ia_archiver|sogou|exabot/i.test(
+                navigator.userAgent || "",
+              );
+            } catch (e) {
+              IS_BOT = false;
+            }
+          }
+          if (IS_BOT) {
+            showContentNow();
+            return;
+          }
+
           /* ---- interactive paths: lock scroll, trap focus, arm the skip ---- */
           /* The cover is definitely going to play, so flag this tab as having
              seen it, so a later back-navigation here skips straight to the
@@ -8138,17 +8253,39 @@
           });
 
           /* Focus trap: make the page behind the cover inert so a keyboard user
-             cannot Tab into nav links that are visually hidden. Guarded because
-             `inert` is unsupported on older browsers (the attribute simply does
-             nothing there, which is the old behaviour, not a regression). */
+             cannot Tab into nav links that are visually hidden. `footer.site-foot`
+             and `.np-card` live OUTSIDE <main>, so without them a Tab still
+             reached the footer links and the backsound player behind the opaque
+             cover. `.skip-link` is here for a subtler reason: it is a fixed
+             element outside <main>, so it stayed the first Tab stop — visible
+             when focused, but inert as a jump target, because #main is itself
+             inert and onIntroKey swallows Enter. A skip link that shows up and
+             then does nothing is worse than one that is simply not offered yet;
+             `inert` keeps it out of the tab order until release() lifts the
+             cover, at which point it is the working first stop it should be.
+             Guarded because `inert` is unsupported on older browsers (the
+             attribute simply does nothing there, which is the old behaviour, not
+             a regression). */
           const inertNodes = Array.prototype.slice.call(
             document.querySelectorAll(
-              "main.page, header.top, .scroll-progress-brush",
+              "main.page, header.top, .scroll-progress-brush, footer.site-foot, .np-card, .skip-link",
             ),
           );
           inertNodes.forEach(function (n) {
             n.setAttribute("inert", "");
           });
+          /* Expose an instant dismissal for the head's 6s failSafe watchdog.
+             `js-failed` un-hides the content but cannot lift the lock and the
+             `inert` trap armed just above — without this hook a slow font or
+             spread decode would leave the page visible but frozen (no scroll,
+             no Tab). dismiss(true) takes the cover out synchronously and runs
+             release(), which is the only code that clears both. Assigned here,
+             after the trap is armed and before every path below (including the
+             mobile early-return), so it is always available when the watchdog
+             fires. */
+          window.__introFailSafe = function () {
+            dismiss(true);
+          };
 
           if (MOBILE) {
             /* The mobile ladder is 100% CSS now (06-paths.md §3): the plates, the
@@ -8249,6 +8386,55 @@
       crossorigin="anonymous"
     ></script>
     <script>
+      /* ---- idle initialisation -------------------------------------------------
+         The four routines that call this (the botanical bloom parallax, the
+         scattered tag cloud, the scroll spy, and the GSAP hover wiring) touch
+         nothing visible at first paint, so their layout reads and GSAP setup are
+         moved off the parse-time critical path — the long-task source behind the
+         mobile TBT figure. Each was an immediately-invoked IIFE (or a bare `if`
+         block); each is a named function now, queued from here.
+
+         They drain ONE PER IDLE WINDOW, never as a batch. Four separate
+         requestIdleCallback calls with the same timeout can all land in a single
+         deadline's task, and the four inits then run back to back — a spike
+         bigger than the sum of the four the deferral was meant to remove. A
+         single self-re-arming pump drains exactly one per callback instead, so
+         the main thread always returns between them. The intro's own gates are
+         deliberately not reused: the cover can hold for seconds waiting on a
+         tap, which would leave the tag cloud unbuilt and so invisible behind it.
+         requestIdleCallback with a bounded timeout keeps each job off busy
+         frames while guaranteeing it runs; a short timer stands in where it is
+         absent (Safari). */
+      var __idleQueue = [];
+      var __idleRunning = false;
+      function __idlePump() {
+        var job = __idleQueue.shift();
+        if (!job) {
+          __idleRunning = false;
+          return;
+        }
+        var next = function () {
+          try {
+            job.fn();
+          } catch (e) {
+            /* one deferred block must not sink the rest of the queue */
+          }
+          __idlePump();
+        };
+        if (typeof window.requestIdleCallback === "function") {
+          window.requestIdleCallback(next, { timeout: 600 });
+        } else {
+          window.setTimeout(next, 1);
+        }
+      }
+      function idleInit(key, fn) {
+        __idleQueue.push({ key: key, fn: fn });
+        if (!__idleRunning) {
+          __idleRunning = true;
+          __idlePump();
+        }
+      }
+
       /* Safe initialization of Lenis */
       if (typeof Lenis !== "undefined") {
         try {
@@ -8324,6 +8510,12 @@
         let animated = false;
         let entranceDone = false;
 
+        /* --- scope: initBounceCards (the DOM fallback fan for #contact) ---
+           `runEntrance`, `checkScrollTrigger` and `cleanup` are reused by name
+           in initPlateCloudAnimation further down; each pair lives in its own
+           IIFE and neither closes over the other, so the names are safe but
+           easy to confuse when reading a 12k-line file. This header names the
+           scope; the twin in initPlateCloudAnimation carries its own. */
         function runEntrance() {
           if (animated) return;
           animated = true;
@@ -8495,7 +8687,17 @@
         var boot = function () {
           if (booted) return;
           booted = true;
-          import("https://cdn.jsdelivr.net/npm/ogl@1.0.11/+esm")
+          /* ogl ships no UMD build, so unlike lenis/gsap/three it cannot be
+             loaded through a <script integrity> tag — and jsDelivr refuses SRI
+             on its generated `+esm` bundles, which left this the one CDN script
+             with no hash. Rather than ship an unverifiable third-party load,
+             the 1.0.11 `+esm` bundle is vendored next to the page as
+             /chin-portfolio/ogl.esm.js and imported same-origin: no third-party
+             supply chain for the carousel at all, and the CSP needs no extra
+             script origin for it. The file is a single self-contained ESM
+             bundle (no relative imports), so a plain dynamic import resolves
+             it. A blocked/offline fetch still falls back to the DOM fan. */
+          import("/chin-portfolio/ogl.esm.js")
             .then(function (ogl) {
               start(ogl);
             })
@@ -8524,6 +8726,8 @@
         }
 
         /* ---------------------------------------------------------------- */
+        /* scope: initContactCarousel — its `start(ogl)` takes the loaded ogl
+           module; the Hasumi egg has its own `start()` with no argument. */
         function start(ogl) {
           var Renderer = ogl.Renderer;
           var Program = ogl.Program;
@@ -9135,6 +9339,32 @@
           canvas.setAttribute("aria-hidden", "true");
           stage.prepend(canvas);
 
+          /* WebGL context loss: the GPU can drop the context at any time (a
+             driver reset, a tab backgrounded too long, a mobile GPU reclaiming
+             memory). Without this, the canvas freezes on its last frame or goes
+             blank and the fan DOM stays hidden, so the Contact section shows
+             nothing. On loss we drop `bc-webgl` and clear the stage: the CSS
+             re-shows the DOM fan, which is a complete, accessible fallback —
+             the WebGL layer is decoration, never the only way to reach a link.
+             `preventDefault()` on the loss event is what lets the browser fire
+             `webglcontextrestored`, but we deliberately do NOT try to rebuild
+             the whole pipeline (textures, render targets, programs) mid-flight;
+             a fresh load gets a fresh carousel, and the fan carries this visit. */
+          canvas.addEventListener(
+            "webglcontextlost",
+            function (e) {
+              e.preventDefault();
+              alive = false;
+              if (raf) {
+                cancelAnimationFrame(raf);
+                raf = 0;
+              }
+              document.documentElement.classList.remove("bc-webgl");
+              if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+            },
+            false,
+          );
+
           var cardProgram = new Program(gl, {
             vertex: CARD_VERTEX,
             fragment: CARD_FRAGMENT,
@@ -9258,7 +9488,14 @@
           var announce = function (index) {
             var item = items[index];
             if (!item) return;
-            if (captionLabel) captionLabel.textContent = item.label;
+            /* The caption used to repeat the card's own label ("EMAIL"), which
+               added nothing the card was not already showing. It now carries the
+               card's value — the address or handle — so the caption is the one
+               place the destination is readable at a glance, and the aria-live
+               region keeps the full label+value phrasing for a screen reader. */
+            if (captionLabel) {
+              captionLabel.textContent = item.value || item.label;
+            }
             if (captionNum) {
               captionNum.textContent = String(index + 1).padStart(2, "0");
             }
@@ -9944,7 +10181,8 @@
       /* ---- Premium GSAP + Lenis Enhancements ---- */
       /* Runs last so every target below already exists in the DOM, and so the
    magnetic `y` here layers on top of the BounceCards fan transform. */
-      if (!REDUCED && typeof gsap !== "undefined" && window.__lenis) {
+      function initGsapEnhance() {
+        if (REDUCED || typeof gsap === "undefined" || !window.__lenis) return;
         const lenis = window.__lenis;
 
         /* 1. Scroll Progress Brush Stroke.
@@ -10010,6 +10248,7 @@
           });
         });
       }
+      idleInit("gsapEnhance", initGsapEnhance);
 
       /* ---- Parallax Botanical Element — bounded, viewport-relative ----
    Deliberately OUTSIDE the GSAP/Lenis guard above: this needs neither
@@ -10028,7 +10267,7 @@
    `getBoundingClientRect()` already includes the offset we applied, so it is
    subtracted back out before measuring — otherwise the element would chase its
    own tail and oscillate. */
-      (function initBloomParallax() {
+      function initBloomParallax() {
         const bloom = document.querySelector(".scroll-reveal-bloom");
         if (!bloom) return;
 
@@ -10080,10 +10319,15 @@
           bloom.addEventListener("load", queue, { once: true });
 
         paint(); // seed the initial position
-      })();
+      }
+      idleInit("bloomParallax", initBloomParallax);
 
       /* Safe initialization of Floating Scattered Tag Cloud GSAP animations */
-      (function initPlateCloudAnimation() {
+      function initPlateCloudAnimation() {
+        /* --- scope: initPlateCloudAnimation ---
+           Its `runEntrance`, `checkScrollTrigger` and `cleanup` share names
+           with the trio in initBounceCards above. Separate IIFEs, separate
+           closures; this banner is the disambiguator for a reader. */
         const isMobile = matchMedia("(max-width: 640px)").matches;
         if (REDUCED) return;
 
@@ -10243,6 +10487,13 @@
         }
 
         let animated = false;
+
+        /* --- scope: initPlateCloudAnimation (the tag-cloud spread) ---
+           `runEntrance`, `checkScrollTrigger` and `cleanup` are reused by name
+           in initBounceCards above; each pair lives in its own IIFE and neither
+           closes over the other, so the names are safe but easy to confuse when
+           reading a 12k-line file. This header names the scope; the twin in
+           initBounceCards carries its own. */
         function runEntrance() {
           if (animated) return;
           animated = true;
@@ -10311,15 +10562,19 @@
           passive: true,
         });
         if (window.__lenis) window.__lenis.on("scroll", checkScrollTrigger);
-      })();
+      }
+      idleInit("plateCloud", initPlateCloudAnimation);
 
       /* ---- Scroll-spy: mark the nav link of the section in view ----
          IntersectionObserver is the right tool: it fires on enter/leave of a
          rootMargin band, not on every scroll pixel, so it is cheap and works
          correctly with Lenis's transformed scroll. The "active" section is the
          one whose top has crossed past ~40% of the viewport. */
-      (function initScrollSpy() {
-        const navLinks = Array.prototype.slice.call(
+      function initScrollSpy() {
+        /* --- scope: initScrollSpy ---
+           Its `setActive(id)` (a nav link, by id) is a different function from
+           the `setActive(i)` in the Hasumi easter-egg IIFE (a costume, by
+           index). Same name, unrelated bodies. */        const navLinks = Array.prototype.slice.call(
           document.querySelectorAll('header.top nav a[href^="#"]'),
         );
         if (!navLinks.length) return;
@@ -10363,7 +10618,8 @@
         window.addEventListener("scroll", function () {
           if (window.scrollY < 80) setActive("");
         }, { passive: true });
-      })();
+      }
+      idleInit("scrollSpy", initScrollSpy);
 
     </script>
 
@@ -11150,6 +11406,11 @@
       (function () {
         "use strict";
         if (window.__hasumiEgg) return;
+        /* --- scope: Hasumi easter egg ---
+           Its `tick(t)`, `start()` and `setActive(i)` share names with the
+           sketchbook's `tick`, the carousel's `start(ogl)` and the scroll
+           spy's `setActive(id)` respectively. Separate IIFEs, separate
+           closures — this banner is the disambiguator. */
 
         var WORD = "hasumi";
         var THREE_URL =
@@ -11250,6 +11511,7 @@
           lastT = 0,
           closing = false,
           token = 0,
+          loadTimer = 0,
           restoreFocus = null,
           onVis = null;
 
@@ -12055,12 +12317,28 @@
 
           var my = ++token;
           if (!loader) loader = new THREE.GLTFLoader();
+          /* A hung fetch (a stalled CDN, a dead connection) never calls either
+             callback, so without a deadline the overlay sits on "Raising the
+             plate…" forever with its buttons disabled. 14s is well past a
+             healthy GLB on 4G but short enough that a visitor does not wait on
+             a stalled socket. The token check makes a late-firing timeout from
+             a superseded load a no-op, and close() clears it outright. */
+          if (loadTimer) clearTimeout(loadTimer);
+          loadTimer = setTimeout(function () {
+            loadTimer = 0;
+            if (my !== token || !overlay) return;
+            variantFailed(new Error("model load timed out"));
+          }, 14000);
           loader.load(
             REPO + VARIANTS[i].file,
             function (gltf) {
               /* Closed, or a later press has taken over, while this was in
                  flight: drop it rather than mounting a stale figure. */
               if (my !== token || !overlay || !renderer) return;
+              if (loadTimer) {
+                clearTimeout(loadTimer);
+                loadTimer = 0;
+              }
               try {
                 mount(gltf);
               } catch (e) {
@@ -12077,6 +12355,10 @@
             undefined,
             function (err) {
               if (my !== token || !overlay) return;
+              if (loadTimer) {
+                clearTimeout(loadTimer);
+                loadTimer = 0;
+              }
               variantFailed(err || new Error("model failed to load"));
             },
           );
@@ -12114,7 +12396,12 @@
              gone; bumping the token makes its callbacks no-ops. */
           token++;
           state.loading = false;
-
+          /* The in-flight load's watchdog belongs to the session that is going
+             away — clear it, or it would fire against a closed overlay. */
+          if (loadTimer) {
+            clearTimeout(loadTimer);
+            loadTimer = 0;
+          }
           if (rafId) cancelAnimationFrame(rafId);
           rafId = 0;
           if (ro) {
