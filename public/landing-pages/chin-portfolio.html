@@ -2137,8 +2137,13 @@
          navy slab: the host clips it to a hard rectangle, so it landed as a
          UI footer bolted under floating art rather than part of the spread.
          The same words on the section's own ground read as an editorial index
-         line, which is all this ever was. Legibility holds without the wash:
-         `--ink` over `--ground` is ~10:1 and `--earth-text` ~6:1. */
+         line, which is all this ever was.
+
+         Legibility is against the RENDERED backdrop, not `--ground`: the fixed
+         `.wash` layer is brighter lower in the viewport, so the caption can sit
+         on ~rgb(76,79,88). There `--ink` holds ~7:1 and `--earth-text` ~4.7:1 —
+         but only at full opacity, so nothing in the caption may fade below 1.
+         (The subtitle's old `.85` failed AA here; see its rule below.) */
       .circular-carousel__caption{
         position:absolute;left:0;right:0;bottom:0;height:52px;
         display:flex;align-items:center;justify-content:space-between;
@@ -2150,9 +2155,12 @@
         display:flex;align-items:baseline;gap:10px;
         animation:cc-swap .5s var(--ease-out) both;
       }
+      /* Full opacity, no fade: the subtitle is 10px text and the backdrop is
+         the RENDERED page, not --ground. The old `.85` composited to ~3.2:1
+         over the brighter `.wash` band (below AA); at 1 it holds ~4.7:1. */
       .circular-carousel__subtitle{
         font-family:var(--font);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
-        color:var(--earth-text);opacity:.85;
+        color:var(--earth-text);
       }
       .circular-carousel__count{
         display:flex;align-items:center;gap:4px;

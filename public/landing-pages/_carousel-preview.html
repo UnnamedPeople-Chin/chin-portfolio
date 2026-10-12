@@ -282,9 +282,11 @@ body{
   display:flex;align-items:baseline;gap:10px;
   animation:cc-swap .5s var(--ease-out) both;
 }
+/* Full opacity, no fade: 10px text on the page ground, not --ground.
+   The old `.85` dropped it under AA on the live page's brighter backdrop. */
 .circular-carousel__subtitle{
   font-family:var(--font);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
-  color:var(--earth-text);opacity:.85;
+  color:var(--earth-text);
 }
 .circular-carousel__count{
   display:flex;align-items:center;gap:4px;
