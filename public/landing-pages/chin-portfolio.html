@@ -1987,7 +1987,9 @@
       .circular-carousel{
         position:relative;
         width:100%;
-        /* Tall enough for the ring plus the 76px caption bar under it. */
+        /* Tall enough for the ring plus the 52px index line under it. The
+           ring is usually width-limited, so the slack below the cards is
+           trimmed rather than left to gape. */
         height:clamp(360px,min(56vh,64vw),560px);
         margin:clamp(10px,1.6vh,20px) 0 clamp(18px,2.6vh,30px);
         overflow:hidden;          /* the stage is scaled to fit, so nothing escapes */
@@ -2129,13 +2131,19 @@
       }
       .circular-carousel__card[data-clickable]{cursor:pointer}
 
-      /* ---- caption ---- */
+      /* ---- caption ----
+         No plate, no bar. The name and the index sit straight on the page
+         ground as type. The old bottom-up `rgba(11,17,32,.72)` wash read as a
+         navy slab: the host clips it to a hard rectangle, so it landed as a
+         UI footer bolted under floating art rather than part of the spread.
+         The same words on the section's own ground read as an editorial index
+         line, which is all this ever was. Legibility holds without the wash:
+         `--ink` over `--ground` is ~10:1 and `--earth-text` ~6:1. */
       .circular-carousel__caption{
-        position:absolute;left:0;right:0;bottom:0;height:76px;
+        position:absolute;left:0;right:0;bottom:0;height:52px;
         display:flex;align-items:center;justify-content:space-between;
         gap:16px;padding:0 clamp(18px,3vw,30px);
         pointer-events:none;
-        background:linear-gradient(0deg,rgba(11,17,32,.72),transparent);
       }
       .circular-carousel__title{
         font-family:var(--display);font-size:clamp(17px,2.4vw,23px);color:var(--ink);
@@ -2151,7 +2159,11 @@
         font-family:var(--display);font-size:clamp(17px,2.4vw,23px);color:var(--ink);
         font-variant-numeric:tabular-nums;
       }
-      .circular-carousel__slash{color:var(--earth);margin:0 3px}
+      /* Lifted from --earth to --earth-text: with the navy slab gone the
+         slash sits on the page's lighter ground, where --earth only reached
+         ~2.6:1 — under AA. --earth-text is the same gold the subtitle uses
+         and clears 4.5:1 on that ground. */
+      .circular-carousel__slash{color:var(--earth-text);margin:0 3px}
       @keyframes cc-swap{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
       /* rolling digits */
@@ -8916,18 +8928,34 @@
           /* One engraving per card, so the ring reads as five different plates
              instead of the same art five times, and each plate is picked to
              suit the brand behind it — cathedral (post) for Email, archer
-             (aim) for TikTok, statue (a maker's monument) for GitHub, baroque
-             (ornament) for Instagram. The botanical plate already carries its
-             own picture on the DOM card; the four links are read off their
+             (aim) for TikTok, statue (a maker's monument) for GitHub, warrior
+             (a draped figure) for Instagram. The botanical plate already carries
+             its own picture on the DOM card; the four links are read off their
              href (the card markup only holds the icon), keyed by the `data-bc`
              order so a re-ordered DOM cannot shuffle the art. All four are the
              page's own engravings, already used by the ornaments, so the ring
-             costs no new request and no new CSP origin. */
+             costs no new request and no new CSP origin.
+
+             Baroque was the original Instagram plate, but it is a 0.48:1
+             dome whose mid-section is almost pure light-grey paper: under the
+             card's `brightness(.70)` it washes out to a flat haze at every
+             crop anchor, so no `object-position` can rescue it. Warrior-640
+             is a high-contrast draped figure that keeps its form under the
+             same filter. */
           var ART = {
             0: "/chin-portfolio/engraved/cathedral.webp",
             1: "/chin-portfolio/engraved/archer-372.webp",
             3: "/chin-portfolio/engraved/statue.webp",
-            4: "/chin-portfolio/engraved/baroque.webp",
+            4: "/chin-portfolio/engraved/warrior-640.webp",
+          };
+          /* Cathedral is 0.33:1 against a roughly square card, so
+             `object-fit:cover` keeps only a ~30% band of it, and the shared
+             45% default lands on the featureless middle. Anchor it to the band
+             that actually holds the subject — the colonnade and arch near the
+             top. The other four already crop well at the default and are left
+             alone, so this stays a one-entry map rather than a rule per card. */
+          var ART_POS = {
+            0: "50% 25%",
           };
           var slot = Number(card.getAttribute("data-bc"));
           var src =
@@ -8941,6 +8969,7 @@
             value: valEl ? valEl.textContent.trim() : "",
             icon: svg ? svg.outerHTML : "",
             src: src,
+            artPos: ART_POS[slot] || "",
             orn: !!bloom,
             /* The botanical plate carries no copy at all — no label, no value
                — so it stays a pure picture. Only cards that actually have a
@@ -8969,7 +8998,7 @@
         var DRAG_THRESHOLD = 5;
         var SPRING = 118;
         var SETTLE_SPEED = 9;
-        var CAPTION_SPACE = 76;
+        var CAPTION_SPACE = 52;
         var TO_RAD = Math.PI / 180;
 
         function clamp(v, a, b) {
@@ -9181,6 +9210,10 @@
               var img = document.createElement("img");
               img.className = "circular-carousel__photo";
               img.src = item.src;
+              /* Per-plate crop anchor (see ART_POS). Empty for the four
+                 cards that already crop well, so they keep the shared CSS
+                 default instead of an inline no-op. */
+              if (item.artPos) img.style.objectPosition = item.artPos;
               img.alt = "";
               img.draggable = false;
               img.decoding = "async";

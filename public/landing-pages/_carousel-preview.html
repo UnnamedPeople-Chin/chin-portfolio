@@ -267,13 +267,15 @@ body{
 }
 .circular-carousel__card[data-clickable]{cursor:pointer}
 
-/* ---- caption ---- */
+/* ---- caption ----
+   No plate: the name and index sit on the page ground as type, matching
+   the live page. The old bottom-up navy wash read as a UI footer bolted
+   under floating art rather than part of the spread. */
 .circular-carousel__caption{
-  position:absolute;left:0;right:0;bottom:0;height:76px;
+  position:absolute;left:0;right:0;bottom:0;height:52px;
   display:flex;align-items:center;justify-content:space-between;
   gap:16px;padding:0 clamp(18px,3vw,30px);
   pointer-events:none;
-  background:linear-gradient(0deg,rgba(11,17,32,.72),transparent);
 }
 .circular-carousel__title{
   font-family:var(--display);font-size:clamp(17px,2.4vw,23px);color:var(--ink);
@@ -289,7 +291,9 @@ body{
   font-family:var(--display);font-size:clamp(17px,2.4vw,23px);color:var(--ink);
   font-variant-numeric:tabular-nums;
 }
-.circular-carousel__slash{color:var(--earth);margin:0 3px}
+/* Lifted to --earth-text: with the navy slab gone the slash sits on the
+   page's lighter ground, where --earth only reached ~2.6:1 (under AA). */
+.circular-carousel__slash{color:var(--earth-text);margin:0 3px}
 @keyframes cc-swap{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* rolling digits */
@@ -384,6 +388,10 @@ var ITEMS = [
     href:"mailto:jizdanyr354@gmail.com",
     label:"Email", value:"jizdanyr354@gmail.com", title:"Email", subtitle:"Mail",
     src:"/chin-portfolio/engraved/cathedral.webp",
+    /* Cathedral is 0.33:1 on a square card, so `cover` keeps only a ~30%
+       band and the shared 45% default lands on the empty middle. Anchor
+       it to the colonnade near the top. */
+    artPos:"50% 25%",
     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.4" y="4.6" width="19.2" height="14.8" rx="2.4"/><path d="m3.2 6.4 8.8 6.6 8.8-6.6"/></svg>'
   },
   {
@@ -407,7 +415,7 @@ var ITEMS = [
   {
     href:"https://www.instagram.com/jizdan.yr", external:true,
     label:"Instagram", value:"@jizdan.yr", title:"Instagram", subtitle:"Social",
-    src:"/chin-portfolio/engraved/baroque.webp",
+    src:"/chin-portfolio/engraved/warrior-640.webp",
     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5.4"/><circle cx="12" cy="12" r="4.4"/><circle cx="17.6" cy="6.4" r="1.15" fill="currentColor" stroke="none"/></svg>'
   }
 ];
@@ -425,7 +433,7 @@ var OVERLAP = 2.5;
 var DRAG_THRESHOLD = 5;
 var SPRING = 118;
 var SETTLE_SPEED = 9;
-var CAPTION_SPACE = 76;
+var CAPTION_SPACE = 52;
 var TO_RAD = Math.PI/180;
 
 function clamp(v,a,b){ return Math.min(b, Math.max(a, v)); }
@@ -565,6 +573,7 @@ function build(){
       var img = document.createElement("img");
       img.className = "circular-carousel__photo";
       img.src = item.src;
+      if (item.artPos) img.style.objectPosition = item.artPos;
       img.alt = "";
       img.draggable = false;
       img.decoding = "async";
