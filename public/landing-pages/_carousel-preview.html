@@ -1,0 +1,1168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CircularCarousel — preview</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='none' stroke='%23C6A053'/></svg>">
+<style>
+/* ============================================================
+   CircularCarousel — port of the pasted React component.
+   The component's own ./CircularCarousel.css was not included in
+   the paste, so every rule below is reconstructed from how the
+   JSX positions and transforms each element. Marked [R] where it
+   is a reconstruction rather than a transcription.
+   ============================================================ */
+
+/* The page's own faces, self-hosted, so the demo reads exactly like the
+   real section instead of a lookalike serif off a CDN. */
+@font-face{font-family:'Instrument Serif';font-style:normal;font-weight:400;font-display:swap;
+  src:url(/chin-portfolio/instrument-serif.woff2) format('woff2')}
+@font-face{font-family:'Instrument Serif';font-style:italic;font-weight:400;font-display:swap;
+  src:url(/chin-portfolio/instrument-serif-italic.woff2) format('woff2')}
+@font-face{font-family:'Switzer';font-style:normal;font-weight:300;font-display:swap;
+  src:url(/chin-portfolio/switzer-300.woff2) format('woff2')}
+@font-face{font-family:'Switzer';font-style:normal;font-weight:400;font-display:swap;
+  src:url(/chin-portfolio/switzer-400.woff2) format('woff2')}
+@font-face{font-family:'Switzer';font-style:normal;font-weight:500;font-display:swap;
+  src:url(/chin-portfolio/switzer-500.woff2) format('woff2')}
+@font-face{font-family:'Switzer';font-style:normal;font-weight:600;font-display:swap;
+  src:url(/chin-portfolio/switzer-600.woff2) format('woff2')}
+
+:root{
+  --ground:#0B1120;
+  --surface:#1A2340;
+  --ink:#EFE7D6;
+  --hairline:rgba(239,231,214,.16);
+  --earth:#C6A053;
+  --earth-text:#DDBE78;
+  --display:'Instrument Serif',"New York",Georgia,'Times New Roman',serif;
+  --font:'Switzer',"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+  --ease-out:cubic-bezier(.25,.46,.45,.94);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--font);
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+
+/* ---------- preview chrome (not part of the component) ---------- */
+.bar{
+  position:sticky;top:0;z-index:10;
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;
+  padding:14px clamp(16px,3vw,34px);
+  background:rgba(11,17,32,.92);
+  border-bottom:1px solid var(--hairline);
+  backdrop-filter:blur(10px);
+}
+.bar__title{
+  font-family:var(--display);font-size:19px;letter-spacing:.01em;margin-right:6px;
+}
+.bar__title span{color:var(--earth-text);font-style:italic}
+.seg{display:flex;border:1px solid var(--hairline);border-radius:9px;overflow:hidden}
+.seg button{
+  appearance:none;border:0;background:transparent;color:var(--ink);
+  font:inherit;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+  padding:8px 13px;cursor:pointer;transition:background .25s,color .25s;
+}
+.seg button+button{border-left:1px solid var(--hairline)}
+.seg button:hover{background:rgba(239,231,214,.06)}
+.seg button[aria-pressed="true"]{background:var(--earth);color:#10172B}
+.ctl{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(239,231,214,.62)}
+.ctl input[type=range]{width:96px;accent-color:var(--earth)}
+.ctl b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums;min-width:34px}
+.ctl label{display:flex;align-items:center;gap:6px;cursor:pointer}
+
+.host{
+  width:min(1100px,100%);
+  margin:clamp(18px,4vh,44px) auto clamp(30px,6vh,70px);
+  padding:0 clamp(16px,3vw,34px);
+}
+.hatch{
+  position:relative;
+  height:clamp(420px,62vh,620px);
+  border:1px solid var(--hairline);
+  border-radius:16px;
+  background:
+    linear-gradient(180deg,rgba(26,35,64,.55),rgba(11,17,32,.2)),
+    repeating-linear-gradient(0deg,rgba(239,231,214,.035) 0 1px,transparent 1px 46px),
+    repeating-linear-gradient(90deg,rgba(239,231,214,.035) 0 1px,transparent 1px 46px);
+  overflow:hidden;
+}
+.note{
+  margin:16px 2px 0;font-size:12.5px;line-height:1.6;
+  color:rgba(239,231,214,.5);max-width:64ch;
+}
+.note code{color:var(--earth-text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+
+/* ============================================================
+   THE COMPONENT
+   ============================================================ */
+
+.circular-carousel{
+  position:relative;
+  width:100%;
+  height:100%;
+  overflow:hidden;          /* [R] stage is scaled to fit, so nothing should escape */
+  touch-action:pan-y;       /* [R] vertical page scroll survives a horizontal drag */
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  outline:none;
+  cursor:grab;
+}
+.circular-carousel[data-dragging]{cursor:grabbing}
+.circular-carousel:focus-visible{outline:2px solid var(--earth);outline-offset:4px;border-radius:16px}
+/* A wheel is dragged along the other axis, so let the page keep the
+   horizontal gesture and the ring take the vertical one. */
+.circular-carousel[data-axis="x"]{touch-action:pan-x}
+
+/* The view is the clip box; wheel and panorama get the soft edge the
+   original gives them, so cards dissolve into the frame instead of
+   ending on a hard line. */
+.circular-carousel__view{
+  position:absolute;inset:0;
+}
+.circular-carousel[data-shape="wheel"] .circular-carousel__view{
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 18%,#000 82%,transparent);
+  mask-image:linear-gradient(to bottom,transparent,#000 18%,#000 82%,transparent);
+}
+.circular-carousel[data-shape="panorama"] .circular-carousel__view{
+  -webkit-mask-image:linear-gradient(to right,transparent,#000 12%,#000 88%,transparent);
+  mask-image:linear-gradient(to right,transparent,#000 12%,#000 88%,transparent);
+}
+/* The stage is a flex-centred box: `perspective` applies to its children
+   and the fit `transform` to itself, and the camera lands exactly on the
+   centre line because of the centring — no inset maths. It fades in once
+   the art is decoded, which is what hides the intro over empty frames. */
+.circular-carousel__stage{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .45s ease;
+}
+.circular-carousel[data-ready] .circular-carousel__stage{opacity:1}
+
+/* Camera, ring and card are all ZERO-SIZED points at the ring centre.
+   Every transform-origin then coincides with that centre, so a card's
+   `rotateY(base) translateZ(R)` swings it around the ring with no
+   half-width bookkeeping anywhere. Only the strips have a size, and each
+   is inset from the card's centre by its own slice geometry. */
+.circular-carousel__camera,
+.circular-carousel__ring,
+.circular-carousel__card{
+  width:0;height:0;
+  transform-style:preserve-3d;
+}
+.circular-carousel__camera{position:relative}
+.circular-carousel__ring,
+.circular-carousel__card{position:absolute;left:0;top:0}
+
+/* The card is cut into TILES that each bend by a slice of the ring's
+   curvature, so the card reads as a curved surface instead of a flat
+   chord. Each tile is positioned inline and carries its own rotateY. */
+.circular-carousel__tile{
+  position:absolute;
+  outline:1px solid transparent;  /* hides the hairline seam between strips */
+  backface-visibility:hidden;     /* a front strip facing away is hidden, */
+  -webkit-backface-visibility:hidden; /* which is what lets the back copy show */
+  touch-action:pan-y;             /* the ring's gesture claims the strip, so a
+                                     press over a card cannot start the
+                                     browser's native link drag. Set explicitly
+                                     (not `inherit`): the camera/ring/card above
+                                     it all compute `auto`, so `inherit` would. */
+}
+.circular-carousel[data-axis="x"] .circular-carousel__tile{touch-action:pan-x}
+
+.circular-carousel__frame{
+  position:absolute;left:0;top:0;width:100%;height:100%;
+  overflow:hidden;                /* clips the photo strip to its slice */
+  background:var(--surface);
+}
+
+.circular-carousel__photo{
+  position:absolute;display:block;max-width:none;
+  object-fit:cover;object-position:50% 45%;
+  pointer-events:none;user-select:none;-webkit-user-drag:none;
+}
+.circular-carousel__photo--leaving{
+  animation:cc-leave 700ms cubic-bezier(.33,1,.68,1) both;
+}
+@keyframes cc-leave{from{opacity:1}to{opacity:0}}
+
+/* Constant scrim on every strip so the label stays legible over any art.
+   Vertical only: every strip has the same height, so the eight gradients
+   stack into one seamless wash instead of eight radial blobs. Top+bottom
+   vignette, because the copy sits at the card's top edge and the value at
+   its bottom, leaving the middle of the plate open. */
+.circular-carousel__scrim{
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(11,17,32,.62) 0%,rgba(11,17,32,.24) 34%,rgba(11,17,32,.28) 62%,rgba(11,17,32,.90) 100%);
+}
+
+/* The botanical plate carries no copy at all, so it stays a clean picture:
+   a light wash, the bloom's own navy ground, and the art CONTAINED (never
+   cropped) exactly as `.bc-card.bc-bloom` has it. */
+.circular-carousel__card[data-orn] .circular-carousel__frame{
+  background:linear-gradient(145deg,var(--surface-mid,#141d31) 0%,var(--surface,#0d1526) 100%);
+}
+.circular-carousel__card[data-orn] .circular-carousel__scrim{
+  background:linear-gradient(180deg,rgba(11,17,32,.14),rgba(11,17,32,.30));
+}
+.circular-carousel__card[data-orn] .circular-carousel__photo{
+  object-fit:contain;object-position:center;
+  padding:11%;
+}
+/* A brand plate is a picture BEHIND copy: hold it back a touch so the icon
+   and the value stay the thing you read. */
+.circular-carousel__card[data-plate] .circular-carousel__photo{
+  filter:brightness(.70) saturate(.82) contrast(1.06);
+}
+
+/* Depth fade: how far this card is turned away from the viewer. */
+.circular-carousel__shade{
+  position:absolute;inset:0;pointer-events:none;
+  background:var(--cc-fade,#000);
+  opacity:var(--cc-depth,0);
+}
+/* Back-of-card shade (only rendered when the preset asks for backfaces). */
+.circular-carousel__inner{
+  position:absolute;inset:0;pointer-events:none;
+  background:#000;
+  opacity:var(--cc-inner,.4);
+}
+
+/* ---- the label overlay ----
+   Lives ONCE per card (not per tile) so the copy is never sliced by the
+   strip boundaries. It is TOP-anchored, not centred: the icon sits over the
+   top of the plate and the label + value hang from the top edge, so the
+   engraving below stays open instead of being buried behind a centred block. */
+.cc-cardlabel{
+  position:absolute;left:50%;top:0;
+  width:calc(var(--cc-card-w,220px) * .80);
+  transform:translate(-50%,0) translateZ(2px);
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding-top:11%;
+  text-align:center;
+  backface-visibility:hidden;
+  pointer-events:none;
+  opacity:calc(1 - var(--cc-depth,0) * 1.15);
+}
+.cc-cardlabel__icon{
+  width:26px;height:26px;display:block;color:var(--ink);opacity:.94;
+}
+.cc-cardlabel__icon svg{display:block;width:100%;height:100%}
+.cc-cardlabel__label{
+  font-size:10px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--earth-text);
+}
+.cc-cardlabel__val{
+  font-family:var(--display);font-size:clamp(13px,calc(var(--cc-card-w,220px) * .075),18px);
+  line-height:1.25;color:var(--ink);
+  max-width:100%;overflow-wrap:anywhere;
+}
+.circular-carousel__card[data-clickable]{cursor:pointer}
+
+/* ---- caption ---- */
+.circular-carousel__caption{
+  position:absolute;left:0;right:0;bottom:0;height:76px;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;padding:0 clamp(18px,3vw,30px);
+  pointer-events:none;
+  background:linear-gradient(0deg,rgba(11,17,32,.72),transparent);
+}
+.circular-carousel__title{
+  font-family:var(--display);font-size:clamp(17px,2.4vw,23px);color:var(--ink);
+  display:flex;align-items:baseline;gap:10px;
+  animation:cc-swap .5s var(--ease-out) both;
+}
+.circular-carousel__subtitle{
+  font-family:var(--font);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--earth-text);opacity:.85;
+}
+.circular-carousel__count{
+  display:flex;align-items:center;gap:4px;
+  font-family:var(--display);font-size:clamp(17px,2.4vw,23px);color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.circular-carousel__slash{color:var(--earth);margin:0 3px}
+@keyframes cc-swap{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* rolling digits */
+.circular-carousel__digits{display:inline-flex}
+.circular-carousel__digit{
+  display:inline-block;position:relative;height:1em;width:.58em;overflow:hidden;
+}
+.circular-carousel__reel{
+  position:absolute;left:0;top:0;width:100%;height:1000%;
+  display:flex;flex-direction:column;
+  transition:transform .55s var(--ease-out);
+}
+.circular-carousel__reel > span{
+  height:10%;display:flex;align-items:center;justify-content:center;line-height:1;
+}
+
+/* screen-reader-only live region */
+.circular-carousel__live{
+  position:absolute;width:1px;height:1px;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;
+}
+
+@media (prefers-reduced-motion:reduce){
+  .circular-carousel__reel{transition:none}
+  .circular-carousel__title{animation:none}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="bar__title">Circular<span>Carousel</span></div>
+
+  <div class="seg" id="presetSeg" role="group" aria-label="Preset">
+    <button data-preset="cylinder" aria-pressed="true">Cylinder</button>
+    <button data-preset="orbit">Orbit</button>
+    <button data-preset="wheel">Wheel</button>
+    <button data-preset="panorama">Panorama</button>
+  </div>
+
+  <div class="ctl">curve <input type="range" id="curve" min="0" max="1" step="0.05" value="1"><b id="curveV">1.00</b></div>
+  <div class="ctl">tilt <input type="range" id="tilt" min="-30" max="30" step="1" value="-5"><b id="tiltV">-5</b></div>
+  <div class="ctl">spread <input type="range" id="spread" min="1" max="2" step="0.05" value="1"><b id="spreadV">1.00</b></div>
+  <div class="ctl">gap <input type="range" id="gap" min="0" max="80" step="2" value="25"><b id="gapV">25</b></div>
+  <div class="ctl">card <input type="range" id="cw" min="130" max="300" step="5" value="220"><b id="cwV">220</b></div>
+  <div class="ctl">fade <input type="range" id="df" min="0" max="1" step="0.05" value="0.55"><b id="dfV">0.55</b></div>
+  <div class="ctl"><label><input type="checkbox" id="cap" checked> caption</label></div>
+  <div class="ctl"><label><input type="checkbox" id="auto" checked> autoplay</label></div>
+</div>
+
+<div class="host">
+  <div class="hatch">
+    <div class="circular-carousel" id="cc" role="region" aria-roledescription="carousel" aria-label="Contact carousel" tabindex="0" draggable="true">
+      <div class="circular-carousel__view">
+        <div class="circular-carousel__stage" id="stage">
+          <div class="circular-carousel__camera" id="camera">
+            <div class="circular-carousel__ring" id="ring"></div>
+          </div>
+        </div>
+      </div>
+      <div class="circular-carousel__caption" id="caption" aria-hidden="true">
+        <span class="circular-carousel__title" id="capTitle"></span>
+        <span class="circular-carousel__count" id="capCount"></span>
+      </div>
+      <div class="circular-carousel__live" id="live" aria-live="polite" aria-atomic="true"></div>
+    </div>
+  </div>
+  <p class="note">
+    Port dari komponen React yang lu kasih ke DOM + CSS biasa. File
+    <code>./CircularCarousel.css</code>-nya nggak ikut ke-paste, jadi awalnya gua
+    rekonstruksi — terus ketemu aslinya di repo
+    <code>react-bits</code> (<code>DavidHDev/react-bits</code>), dan versi ini udah
+    disamain ke situ: kartu 0×0 di pusat ring, strip-nya yang dibengkokkin,
+    mask-image di wheel &amp; panorama, stage fade-in, angka yang muter.
+    Bedanya cuma satu, dan sengaja: label kontak nempel di tengah tiap kartu
+    (aslinya cuma caption di bawah), plus <code>&lt;a href&gt;</code> asli biar
+    tiap kartu tetap bisa diklik. Preset bisa diganti di bar atas, dan semua
+    angka (curve / tilt / spread / gap / card / fade) bisa digeser.
+  </p>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ======================= the five contact cards ======================= */
+/* Mixed content, as asked: each plate keeps its contact link, its icon and
+   its copy, and rides on one of the page's own engravings. The botanical
+   plate is the one with no link — it never had one. */
+var ITEMS = [
+  {
+    href:"mailto:jizdanyr354@gmail.com",
+    label:"Email", value:"jizdanyr354@gmail.com", title:"Email", subtitle:"Mail",
+    src:"/chin-portfolio/engraved/cathedral.webp",
+    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.4" y="4.6" width="19.2" height="14.8" rx="2.4"/><path d="m3.2 6.4 8.8 6.6 8.8-6.6"/></svg>'
+  },
+  {
+    href:"https://www.tiktok.com/@jizdanyr", external:true,
+    label:"TikTok", value:"@jizdanyr", title:"TikTok", subtitle:"Social",
+    src:"/chin-portfolio/engraved/archer-372.webp",
+    icon:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>'
+  },
+  {
+    href:null, botanical:true,
+    label:"Botanical illustration", value:"", title:"Botanical", subtitle:"Plate",
+    src:"/chin-portfolio/bloom-engraved.webp",
+    icon:""
+  },
+  {
+    href:"https://github.com/UnnamedPeople-Chin", external:true,
+    label:"GitHub", value:"@UnnamedPeople-Chin", title:"GitHub", subtitle:"Code",
+    src:"/chin-portfolio/engraved/statue.webp",
+    icon:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z"/></svg>'
+  },
+  {
+    href:"https://www.instagram.com/jizdan.yr", external:true,
+    label:"Instagram", value:"@jizdan.yr", title:"Instagram", subtitle:"Social",
+    src:"/chin-portfolio/engraved/baroque.webp",
+    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5.4"/><circle cx="12" cy="12" r="4.4"/><circle cx="17.6" cy="6.4" r="1.15" fill="currentColor" stroke="none"/></svg>'
+  }
+];
+
+/* ======================= constants (from the component) ======================= */
+var PRESETS = {
+  cylinder:{ axis:"y", tilt:-5,  perspective:2500, curve:1, spread:1,    inward:false, billboard:false, backfaces:true,  window:0   },
+  orbit:   { axis:"y", tilt:-16, perspective:1500, curve:0, spread:1.45, inward:false, billboard:true,  backfaces:false, window:0   },
+  wheel:   { axis:"x", tilt:0,   perspective:1800, curve:0, spread:1,    inward:false, billboard:false, backfaces:true,  window:1.7 },
+  panorama:{ axis:"y", tilt:0,   perspective:0,    curve:1, spread:1,    inward:true,  billboard:false, backfaces:false, window:0   }
+};
+var INTRO_LENGTH = { assemble:1500, rise:1400, spin:1800, none:0 };
+var TILES = 8;
+var OVERLAP = 2.5;
+var DRAG_THRESHOLD = 5;
+var SPRING = 118;
+var SETTLE_SPEED = 9;
+var CAPTION_SPACE = 76;
+var TO_RAD = Math.PI/180;
+
+function clamp(v,a,b){ return Math.min(b, Math.max(a, v)); }
+function wrap(d){ return ((((d+180)%360)+360)%360)-180; }
+function easeOut(t){ return 1-Math.pow(1-t,4); }
+function easeOutQuint(t){ return 1-Math.pow(1-t,5); }
+function rotateX(p,d){ var r=d*TO_RAD,c=Math.cos(r),s=Math.sin(r); return [p[0], p[1]*c-p[2]*s, p[1]*s+p[2]*c]; }
+function rotateY(p,d){ var r=d*TO_RAD,c=Math.cos(r),s=Math.sin(r); return [p[0]*c+p[2]*s, p[1], -p[0]*s+p[2]*c]; }
+
+/* ======================= options ======================= */
+var opts = {
+  preset:"cylinder",
+  curve:1, tilt:-5, spread:1, gap:25, cardWidth:220, aspectRatio:1,
+  autoplay:"drift", speed:14, intro:"rise",
+  captions:true, depthFade:0.55, fadeColor:"#000000",
+  innerShade:0.6, cornerRadius:12,
+  draggable:true, snap:true, pauseOnHover:true, momentum:0.6,
+  parallax:0.3, stretch:0.5
+};
+
+var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ======================= DOM ======================= */
+var root   = document.getElementById("cc");
+var stageEl= document.getElementById("stage");
+var cameraEl=document.getElementById("camera");
+var ringEl = document.getElementById("ring");
+var capEl  = document.getElementById("caption");
+var capTitleEl = document.getElementById("capTitle");
+var capCountEl = document.getElementById("capCount");
+var liveEl = document.getElementById("live");
+
+var count = ITEMS.length;
+var step = 360/count;
+var layout, axis, tiltValue, curveValue, perspectiveValue;
+var radius=600, cardW, cardH, along;
+var tiles=[];       /* geometry, recomputed whenever the card size or curve changes */
+var cards=[];       /* { el, labelEl, tiles:[{el, move}], backs:[...] } */
+var activeIndex = 0;
+var ready = false;
+
+var state = {
+  angle:0, velocity:0, target:null, dir:-1,
+  press:null, drag:false, hover:false,
+  pointer:{ inside:false, x:0, y:0 },
+  yaw:0, pitch:0,
+  intro:null, introDone:false,
+  holdUntil:0, fit:1, shift:0, drop:0, last:0,
+  suppressClick:false, visible:true
+};
+
+function readLayout(){
+  var shape = PRESETS[opts.preset] ? opts.preset : "cylinder";
+  layout = PRESETS[shape];
+  axis = layout.axis;
+  tiltValue = (opts.tilt===null||opts.tilt===undefined) ? layout.tilt : opts.tilt;
+  curveValue = layout.billboard ? 0 : clamp(opts.curve===null?layout.curve:opts.curve, 0, 1);
+  perspectiveValue = layout.inward ? 0 : (opts.perspective===null?layout.perspective:opts.perspective);
+  cardW = Math.max(40, opts.cardWidth);
+  cardH = cardW / clamp(opts.aspectRatio, 0.2, 5);
+  along = axis==="x" ? cardH : cardW;
+  root.setAttribute("data-axis", axis);
+  root.setAttribute("data-shape", shape);
+  root.style.setProperty("--cc-card-w", cardW+"px");
+  root.style.setProperty("--cc-card-h", cardH+"px");
+  /* the strips need the card size as numbers, and the card element itself is
+     a zero-sized point, so hand it over as a custom property too */
+  root.style.setProperty("--cc-along", along+"px");
+}
+
+function computeRadius(){
+  var n = Math.max(count,3);
+  var pitch = (along + opts.gap) * layout.spread;
+  var chord = pitch / (2*Math.sin(Math.PI/n));
+  var arc = (n*pitch)/(2*Math.PI);
+  radius = Math.max(chord + (arc-chord)*curveValue, along*0.6);
+  if (layout.inward) perspectiveValue = radius;
+}
+
+function computeTiles(){
+  var total = curveValue > 0.001 ? TILES : 1;
+  var length = along/total;
+  var bend = curveValue > 0.001 ? radius/curveValue : 0;
+  tiles = [];
+  for (var index=0; index<total; index++){
+    var start = index*length - (index>0 ? OVERLAP/2 : 0);
+    var end   = (index+1)*length + (index<total-1 ? OVERLAP/2 : 0);
+    var center = (start+end)/2 - along/2;
+    var alpha = bend ? center/bend : 0;
+    var shift = bend ? bend*Math.sin(alpha) : center;
+    var sink  = bend ? bend*(1-Math.cos(alpha)) : 0;
+    var depth = layout.inward ? sink : -sink;
+    var turn  = ((layout.inward ? -alpha : alpha)*180)/Math.PI;
+    var move = axis==="x"
+      ? "translate3d(0px,"+shift+"px,"+depth+"px) rotateX("+(-turn)+"deg)"
+      : "translate3d("+shift+"px,0px,"+depth+"px) rotateY("+turn+"deg)";
+    tiles.push({ index:index, total:total, start:start, end:end, size:end-start, move:move });
+  }
+}
+
+/* ======================= build ======================= */
+function build(){
+  ringEl.innerHTML = "";
+  cards = [];
+  ITEMS.forEach(function(item, i){
+    var card = document.createElement(item.href ? "a" : "div");
+    card.className = "circular-carousel__card";
+    /* A real <a href> is natively draggable, and a press-and-move over one
+       starts the browser's link drag and fires `pointercancel` at the ring —
+       so a drag begun on a card did nothing. Kill the native drag; the ring's
+       own handler owns the gesture, and a press that never moved still falls
+       through to the anchor as a click. */
+    card.setAttribute("draggable","false");
+    card.setAttribute("data-cc-index", String(i));
+    if (item.botanical && tiles.length===1) card.setAttribute("data-orn","");
+    else if (item.href) card.setAttribute("data-plate","");
+    card.setAttribute("role","group");
+    card.setAttribute("aria-roledescription","slide");
+    card.setAttribute("aria-label", (item.title||item.label)+", "+(i+1)+" of "+count);
+    if (item.href){
+      card.setAttribute("href", item.href);
+      if (item.external){ card.setAttribute("target","_blank"); card.setAttribute("rel","noopener"); }
+      card.setAttribute("data-clickable","");
+    } else {
+      card.setAttribute("role","img");
+      card.setAttribute("aria-label", item.label);
+    }
+
+    var rec = { el:card, tiles:[], backs:[] };
+
+    function strip(tile, back){
+      var el = document.createElement("div");
+      el.className = "circular-carousel__tile";
+      el.setAttribute("aria-hidden","true");
+      var frame = document.createElement("div");
+      frame.className = "circular-carousel__frame";
+      var img = document.createElement("img");
+      img.className = "circular-carousel__photo";
+      img.src = item.src;
+      img.alt = "";
+      img.draggable = false;
+      img.decoding = "async";
+      var scrim = document.createElement("div");
+      scrim.className = "circular-carousel__scrim";
+      frame.appendChild(img);
+      frame.appendChild(scrim);
+      if (back){
+        var inner = document.createElement("div");
+        inner.className = "circular-carousel__inner";
+        frame.appendChild(inner);
+      }
+      var shade = document.createElement("div");
+      shade.className = "circular-carousel__shade";
+      frame.appendChild(shade);
+      el.appendChild(frame);
+      return { el:el, frame:frame, img:img, back:back, tile:tile };
+    }
+
+    /* each strip is placed inline: it is a slice of the card, and its
+       photo is offset by the slice's own start so the picture stays put */
+    function placeStrip(s, tile, back){
+      var stripIndex = back ? tile.total-1-tile.index : tile.index;
+      var first = stripIndex===0;
+      var last  = stripIndex===tile.total-1;
+      var r = "var(--cc-radius)";
+      var frameRadius = axis==="x"
+        ? (first?r:0)+" "+(first?r:0)+" "+(last?r:0)+" "+(last?r:0)
+        : (first?r:0)+" "+(last?r:0)+" "+(last?r:0)+" "+(first?r:0);
+      var offset = back ? along-tile.end : tile.start;
+      var size = tile.size;
+      var flip = axis==="x" ? " rotateX(180deg)" : " rotateY(180deg)";
+      /* The card is a zero-sized point at the ring centre, so a strip's
+         origin IS that centre: the strip must be centred on the centre
+         (inset by half its OWN slice, half the card in the cross axis), and
+         only THEN does `tile.move` swing it out to the arc. Offsetting the
+         box by half the CARD double-counts that centring and shoves every
+         card half a width off the ring. */
+      var box = axis==="x"
+        ? { left:-cardW/2, top:-size/2, width:cardW, height:size }
+        : { left:-size/2, top:-cardH/2, width:size, height:cardH };
+      var photo = axis==="x"
+        ? { left:"0px", top:(-offset)+"px", width:cardW+"px", height:cardH+"px" }
+        : { left:(-offset)+"px", top:"0px", width:cardW+"px", height:cardH+"px" };
+      s.el.style.left = box.left+"px";
+      s.el.style.top = box.top+"px";
+      s.el.style.width = box.width+"px";
+      s.el.style.height = box.height+"px";
+      s.el.style.transform = tile.move + (back ? flip : "");
+      s.frame.style.borderRadius = frameRadius;
+      s.img.style.left = photo.left;
+      s.img.style.top = photo.top;
+      s.img.style.width = photo.width;
+      s.img.style.height = photo.height;
+    }
+
+    tiles.forEach(function(tile){
+      var f = strip(tile,false);
+      placeStrip(f, tile, false);
+      card.appendChild(f.el);
+      rec.tiles.push(f);
+      if (layout.backfaces){
+        var b = strip(tile,true);
+        placeStrip(b, tile, true);
+        card.appendChild(b.el);
+        rec.backs.push(b);
+      }
+    });
+
+    /* the label overlay — once per card, never sliced. The botanical plate
+       carries no copy at all (in the live page it has no `.bc-label`), so it
+       gets no overlay: only cards with an icon + label do. */
+    if (item.icon){
+      var lab = document.createElement("div");
+      lab.className = "cc-cardlabel";
+      lab.setAttribute("aria-hidden","true");
+      var ic = document.createElement("span");
+      ic.className = "cc-cardlabel__icon";
+      ic.innerHTML = item.icon;
+      lab.appendChild(ic);
+      var l = document.createElement("span");
+      l.className = "cc-cardlabel__label";
+      l.textContent = item.label;
+      lab.appendChild(l);
+      if (item.value){
+        var v = document.createElement("span");
+        v.className = "cc-cardlabel__val";
+        v.textContent = item.value;
+        lab.appendChild(v);
+      }
+      card.appendChild(lab);
+      rec.labelEl = lab;
+    }
+
+    ringEl.appendChild(card);
+    cards.push(rec);
+  });
+}
+
+function rebuildGeometry(){
+  readLayout();
+  computeRadius();
+  computeTiles();
+  build();
+  measure();
+  render(performance.now());
+}
+
+/* ======================= measure / fit ======================= */
+function measure(){
+  var rect = root.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  var room = opts.captions ? CAPTION_SPACE : 0;
+  var width  = rect.width * 0.94;
+  var height = (rect.height - room) * 0.92;
+  var P = perspectiveValue;
+  var minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+
+  if (layout.inward){
+    /* The original trusts the frame here: the inward camera sits at the ring
+       centre, so the front card is at ~zero distance and fills the stage
+       (the 0.94/0.92 margins absorb the few percent that overflow) while the
+       side cards are angled away and read as texture at the edges. Deriving
+       a fit from a perspective divide instead shrinks the whole ring to a
+       dot — the front card's divide is ~1, the sides' is not, and the two
+       cannot share one scale. So keep it simple, like the original. */
+    minX=-width/2; maxX=width/2; minY=-cardH/2; maxY=cardH/2;
+  } else {
+    var corners = [
+      [-cardW/2,-cardH/2],[cardW/2,-cardH/2],
+      [-cardW/2, cardH/2],[cardW/2, cardH/2]
+    ];
+    var limit = layout.window ? layout.window*step : 180;
+    for (var a=-limit; a<=limit; a+=limit/24){
+      for (var ci=0; ci<corners.length; ci++){
+        var cx=corners[ci][0], cy=corners[ci][1], p;
+        if (axis==="x"){
+          p = rotateY(rotateX([cx,cy,radius], -a), tiltValue);
+        } else if (layout.billboard){
+          var c = rotateY([0,0,radius], a);
+          p = rotateX([c[0]+cx, cy, c[2]], tiltValue);
+        } else {
+          p = rotateX(rotateY([cx,cy,radius], a), tiltValue);
+        }
+        p = [p[0], p[1], p[2]-radius];
+        if (p[2] >= P*0.95) continue;
+        var k = P/(P-p[2]);
+        minX=Math.min(minX,p[0]*k); maxX=Math.max(maxX,p[0]*k);
+        minY=Math.min(minY,p[1]*k); maxY=Math.max(maxY,p[1]*k);
+      }
+    }
+  }
+  var spanX = Math.max(maxX-minX,1);
+  var spanY = Math.max(maxY-minY,1);
+  var fit = Math.min(1, width/spanX, height/spanY);
+  state.fit = fit;
+  state.shift = -((minY+maxY)/2)*fit - room/2;
+  state.drop = axis==="x" ? (rect.width/fit)*0.55 + cardW : (rect.height/fit)*0.55 + cardH;
+  stageEl.style.perspective = P+"px";
+  stageEl.style.transform = "translate3d(0,"+state.shift+"px,0) scale("+fit+")";
+}
+
+/* ======================= intro ======================= */
+function introCard(elapsed, landing){
+  if (!state.intro) return { radius:1, lift:0 };
+  var type = state.intro.type;
+  var reach = Math.abs(wrap(landing + state.angle));
+  if (type==="assemble"){
+    var delay = (reach/180)*420;
+    var p = easeOut(clamp((elapsed-delay)/1080,0,1));
+    return { radius:1+0.6*(1-p), lift:0 };
+  }
+  if (type==="rise"){
+    var delay2 = (reach/180)*480;
+    var p2 = easeOutQuint(clamp((elapsed-delay2)/900,0,1));
+    return { radius:1, lift:(1-p2)*state.drop };
+  }
+  if (type==="spin"){
+    var p3 = easeOut(clamp(elapsed/INTRO_LENGTH.spin,0,1));
+    return { radius:1+0.28*(1-p3), lift:0 };
+  }
+  return { radius:1, lift:0 };
+}
+
+/* ======================= render ======================= */
+function nearest(angle){ return Math.round(angle/step)*step; }
+
+function render(now){
+  var elapsed = state.intro ? now-state.intro.start : 0;
+  var swell = 1 + opts.stretch*0.12*Math.min(1, Math.abs(state.velocity)/420);
+  var spinOffset = 0;
+  if (state.intro && state.intro.type==="spin"){
+    var ps = easeOut(clamp(elapsed/INTRO_LENGTH.spin,0,1));
+    spinOffset = -300*state.dir*(1-ps);
+  } else if (state.intro && state.intro.type==="assemble"){
+    var pa = easeOut(clamp(elapsed/INTRO_LENGTH.assemble,0,1));
+    spinOffset = -32*state.dir*(1-pa);
+  }
+  var angle = state.angle + spinOffset;
+  var R = radius*swell;
+
+  if (axis==="x"){
+    cameraEl.style.transform = "translate3d(0,0,"+(-R)+"px) rotateY("+(tiltValue+state.yaw)+"deg) rotateX("+state.pitch+"deg)";
+    ringEl.style.transform = "rotateX("+(-angle)+"deg)";
+  } else if (layout.inward){
+    cameraEl.style.transform = "translate3d(0,0,"+(perspectiveValue-1)+"px) rotateX("+(tiltValue+state.pitch)+"deg) rotateY("+state.yaw+"deg)";
+    ringEl.style.transform = "rotateY("+angle+"deg)";
+  } else {
+    cameraEl.style.transform = "translate3d(0,0,"+(-R)+"px) rotateX("+(tiltValue+state.pitch)+"deg) rotateY("+state.yaw+"deg)";
+    ringEl.style.transform = "rotateY("+angle+"deg)";
+  }
+
+  for (var index=0; index<count; index++){
+    var card = cards[index];
+    if (!card) continue;
+    var base = index*step;
+    var mod = introCard(elapsed, base);
+    var r = R*mod.radius;
+    var transform;
+    if (axis==="x"){
+      transform = "rotateX("+(-base)+"deg) translateZ("+r+"px)";
+    } else if (layout.inward){
+      transform = "rotateY("+base+"deg) translateZ("+(-r)+"px)";
+    } else {
+      transform = "rotateY("+base+"deg) translateZ("+r+"px)";
+      if (layout.billboard) transform += " rotateY("+(-(base+angle))+"deg)";
+    }
+    if (mod.lift) transform += axis==="x" ? " translateX("+mod.lift+"px)" : " translateY("+mod.lift+"px)";
+    card.el.style.transform = transform;
+
+    var world = wrap(base+angle);
+    var facing = Math.cos(world*TO_RAD);
+    if (layout.inward) card.el.style.visibility = Math.abs(world)>86 ? "hidden" : "";
+    var fade = opts.depthFade*Math.pow((1-facing)/2,1.25);
+    card.el.style.setProperty("--cc-depth", fade.toFixed(3));
+  }
+
+  var idx = ((Math.round(-state.angle/step)%count)+count)%count || 0;
+  if (idx!==activeIndex) setActive(idx);
+}
+
+function setActive(i){
+  activeIndex = i;
+  var item = ITEMS[i];
+  if (!item) return;
+  var label = item.title || item.label;
+  if (opts.captions){
+    /* The original remounts the title on every change (React key), which is
+       what replays the swap animation. Rebuilding the node does the same. */
+    var fresh = document.createElement("span");
+    fresh.className = "circular-carousel__title";
+    fresh.appendChild(document.createTextNode(label));
+    if (item.subtitle){
+      var s = document.createElement("span");
+      s.className = "circular-carousel__subtitle";
+      s.textContent = item.subtitle;
+      fresh.appendChild(s);
+    }
+    capTitleEl.replaceWith(fresh);
+    capTitleEl = fresh;
+    capCountEl.innerHTML = "";
+    capCountEl.appendChild(digits(i+1));
+    var slash = document.createElement("span");
+    slash.className = "circular-carousel__slash";
+    slash.textContent = "/";
+    capCountEl.appendChild(slash);
+    var tot = document.createElement("span");
+    tot.textContent = String(count).padStart(2,"0");
+    capCountEl.appendChild(tot);
+  }
+  liveEl.textContent = label+", "+(i+1)+" of "+count;
+}
+
+function digits(value){
+  var wrapEl = document.createElement("span");
+  wrapEl.className = "circular-carousel__digits";
+  String(value).padStart(2,"0").split("").forEach(function(d){
+    var box = document.createElement("span");
+    box.className = "circular-carousel__digit";
+    var reel = document.createElement("span");
+    reel.className = "circular-carousel__reel";
+    reel.style.transform = "translateY("+(-Number(d)*10)+"%)";
+    "0123456789".split("").forEach(function(n){
+      var s = document.createElement("span");
+      s.textContent = n;
+      reel.appendChild(s);
+    });
+    box.appendChild(reel);
+    wrapEl.appendChild(box);
+  });
+  return wrapEl;
+}
+
+/* ======================= advance / frame loop ======================= */
+var raf = 0;
+
+function advance(dt, now){
+  if (!state.introDone && ready){
+    if (!state.intro){
+      if (opts.intro==="none" || reduced) state.introDone = true;
+      else state.intro = { type:opts.intro, start:now };
+    }
+    if (state.intro && now-state.intro.start >= INTRO_LENGTH[state.intro.type]){
+      state.intro = null; state.introDone = true;
+    }
+  }
+
+  var paused = (opts.pauseOnHover && state.hover) || state.drag || now < state.holdUntil;
+  var cruise = (opts.autoplay==="drift" && !reduced && !paused && !state.intro) ? opts.speed*state.dir : 0;
+  var busy = Boolean(state.intro) || state.drag;
+
+  if (state.drag || state.intro){
+    state.velocity = state.drag ? state.velocity : 0;
+  } else if (state.target!==null){
+    var remaining = dt;
+    var damping = 2*Math.sqrt(SPRING);
+    while (remaining>0){
+      var h = Math.min(remaining, 1/240);
+      var accel = SPRING*(state.target-state.angle) - damping*state.velocity;
+      state.velocity += accel*h;
+      state.angle += state.velocity*h;
+      remaining -= h;
+    }
+    if (Math.abs(state.target-state.angle)<0.004 && Math.abs(state.velocity)<0.03){
+      state.angle = state.target; state.velocity = 0; state.target = null;
+    }
+    busy = true;
+  } else {
+    var tau = 0.18 + opts.momentum*1.5;
+    state.velocity += (cruise-state.velocity)*(1-Math.exp(-dt/tau));
+    state.angle += state.velocity*dt;
+    if (cruise===0 && opts.snap && Math.abs(state.velocity)<SETTLE_SPEED) state.target = nearest(state.angle);
+    busy = busy || cruise!==0 || Math.abs(state.velocity)>0.01 || state.target!==null;
+  }
+
+  var ease = 1-Math.exp(-dt/0.35);
+  var aimYaw = state.pointer.inside ? state.pointer.x*opts.parallax*9 : 0;
+  var aimPitch = state.pointer.inside ? -state.pointer.y*opts.parallax*6 : 0;
+  state.yaw += (aimYaw-state.yaw)*ease;
+  state.pitch += (aimPitch-state.pitch)*ease;
+  if (Math.abs(aimYaw-state.yaw)>0.01 || Math.abs(aimPitch-state.pitch)>0.01) busy = true;
+
+  return busy;
+}
+
+function frame(now){
+  raf = 0;
+  var dt = state.last ? Math.min((now-state.last)/1000, 0.05) : 1/60;
+  state.last = now;
+  var busy = advance(dt, now);
+  render(now);
+  if (busy && state.visible && !document.hidden) raf = requestAnimationFrame(frame);
+  else state.last = 0;
+}
+function wake(){
+  if (!raf && state.visible && !document.hidden) raf = requestAnimationFrame(frame);
+}
+
+/* ======================= input ======================= */
+function updatePointer(e){
+  var rect = root.getBoundingClientRect();
+  state.pointer.x = clamp(((e.clientX-rect.left)/rect.width)*2-1, -1, 1);
+  state.pointer.y = clamp(((e.clientY-rect.top)/rect.height)*2-1, -1, 1);
+}
+
+root.addEventListener("pointerdown", function(e){
+  state.suppressClick = false;
+  if (!opts.draggable || e.button!==0) return;
+  state.press = { id:e.pointerId, x:e.clientX, y:e.clientY, angle:state.angle, moved:false, origin:0,
+                  samples:[{time:performance.now(), angle:state.angle}] };
+});
+
+root.addEventListener("pointermove", function(e){
+  if (e.pointerType==="mouse"){ state.pointer.inside = true; updatePointer(e); }
+  var press = state.press;
+  if (!press || press.id!==e.pointerId){ wake(); return; }
+  var delta = axis==="x" ? e.clientY-press.y : e.clientX-press.x;
+  var cross = axis==="x" ? e.clientX-press.x : e.clientY-press.y;
+  if (!press.moved){
+    if (Math.abs(delta)<DRAG_THRESHOLD) return;
+    if (Math.abs(cross) > Math.abs(delta)*1.2 && e.pointerType!=="mouse"){ state.press = null; return; }
+    press.moved = true; press.origin = delta;
+    state.drag = true; state.target = null; state.velocity = 0;
+    root.setAttribute("data-dragging","");
+    try { root.setPointerCapture(e.pointerId); } catch(err){}
+  }
+  var perPixel = 180/(Math.PI*radius*state.fit);
+  state.angle = press.angle + (delta-press.origin)*perPixel*(layout.inward?-1:1);
+  var t = performance.now();
+  press.samples.push({ time:t, angle:state.angle });
+  while (press.samples.length>2 && t-press.samples[0].time>110) press.samples.shift();
+  wake();
+});
+
+function release(e){
+  var press = state.press;
+  if (!press || press.id!==e.pointerId) return;
+  state.press = null;
+  if (!press.moved) return;
+  state.drag = false;
+  root.removeAttribute("data-dragging");
+  state.suppressClick = true;
+  var first = press.samples[0], last = press.samples[press.samples.length-1];
+  var span = (last.time-first.time)/1000;
+  var velocity = span>0.008 ? clamp((last.angle-first.angle)/span, -1400, 1400) : 0;
+  state.velocity = velocity;
+  if (Math.abs(velocity)>60) state.dir = Math.sign(velocity);
+  var coasting = opts.autoplay==="drift" && !(opts.pauseOnHover && state.hover && e.pointerType==="mouse");
+  if (opts.snap && !coasting){
+    var tau = 0.18+opts.momentum*1.5;
+    state.target = Math.round((state.angle+velocity*tau*0.55)/step)*step;
+  }
+  wake();
+}
+root.addEventListener("pointerup", release);
+root.addEventListener("pointercancel", release);
+
+root.addEventListener("pointerenter", function(e){ if (e.pointerType!=="mouse") return; state.hover = true; wake(); });
+root.addEventListener("pointerleave", function(e){
+  if (e.pointerType==="mouse"){ state.hover = false; state.pointer.inside = false; }
+  wake();
+});
+
+root.addEventListener("click", function(e){
+  if (state.suppressClick){ state.suppressClick = false; return; }
+  var card = e.target.closest && e.target.closest("[data-cc-index]");
+  if (!card) return;
+  var index = Number(card.getAttribute("data-cc-index"));
+  var item = ITEMS[index];
+  if (!item) return;
+  if (item.href){
+    /* let the anchor do its job — it is a real <a href> */
+    return;
+  }
+  focusIndex(index);
+});
+
+root.addEventListener("wheel", function(e){
+  if (!opts.draggable) return;
+  var delta = Math.abs(e.deltaX)>Math.abs(e.deltaY) ? e.deltaX : 0;
+  if (!delta) return;
+  e.preventDefault();
+  var perPixel = 180/(Math.PI*radius*state.fit);
+  state.target = null;
+  state.angle -= delta*perPixel*(layout.inward?-1:1);
+  state.velocity = -delta*perPixel*(layout.inward?-1:1)*30;
+  state.holdUntil = performance.now()+1600;
+  wake();
+}, { passive:false });
+
+function focusIndex(index){
+  var target = -index*step;
+  target += 360*Math.round((state.angle-target)/360);
+  state.target = target;
+  state.holdUntil = performance.now()+2800;
+  wake();
+}
+function stepBy(delta){
+  var base = state.target!==null ? state.target : Math.round(state.angle/step)*step;
+  state.target = base - delta*step*(layout.inward?-1:1);
+  state.holdUntil = performance.now()+2800;
+  wake();
+}
+root.addEventListener("keydown", function(e){
+  var fwd = axis==="x" ? "ArrowDown" : "ArrowRight";
+  var bwd = axis==="x" ? "ArrowUp" : "ArrowLeft";
+  if (e.key===fwd) stepBy(1);
+  else if (e.key===bwd) stepBy(-1);
+  else if (e.key==="Home") focusIndex(0);
+  else if (e.key==="End") focusIndex(count-1);
+  else if (e.key==="Enter" || e.key===" "){
+    var item = ITEMS[activeIndex];
+    if (item && item.href) window.open(item.href, item.external?"_blank":"_self");
+  } else return;
+  e.preventDefault();
+});
+
+/* ======================= lifecycle ======================= */
+new ResizeObserver(function(){ measure(); wake(); }).observe(root);
+new IntersectionObserver(function(entries){
+  state.visible = entries[0].isIntersecting;
+  if (state.visible) wake();
+  else { cancelAnimationFrame(raf); raf = 0; state.last = 0; }
+}).observe(root);
+document.addEventListener("visibilitychange", function(){
+  if (document.hidden){ cancelAnimationFrame(raf); raf = 0; state.last = 0; }
+  else wake();
+});
+
+/* ======================= preview controls ======================= */
+function syncControls(){
+  document.getElementById("curve").value = opts.curve;
+  document.getElementById("curveV").textContent = opts.curve.toFixed(2);
+  document.getElementById("tilt").value = opts.tilt;
+  document.getElementById("tiltV").textContent = opts.tilt;
+  document.getElementById("spread").value = opts.spread;
+  document.getElementById("spreadV").textContent = opts.spread.toFixed(2);
+  document.getElementById("gap").value = opts.gap;
+  document.getElementById("gapV").textContent = opts.gap;
+  document.getElementById("cw").value = opts.cardWidth;
+  document.getElementById("cwV").textContent = opts.cardWidth;
+  document.getElementById("df").value = opts.depthFade;
+  document.getElementById("dfV").textContent = opts.depthFade.toFixed(2);
+  document.getElementById("cap").checked = opts.captions;
+  document.getElementById("auto").checked = opts.autoplay==="drift";
+  [].forEach.call(document.querySelectorAll("#presetSeg button"), function(b){
+    b.setAttribute("aria-pressed", String(b.getAttribute("data-preset")===opts.preset));
+  });
+}
+
+function applyPreset(name){
+  var p = PRESETS[name]; if (!p) return;
+  opts.preset = name;
+  opts.curve = p.curve;
+  opts.tilt = p.tilt;
+  opts.spread = p.spread;
+  opts.perspective = p.perspective;
+  syncControls();
+  rebuildGeometry();
+  wake();
+}
+
+document.getElementById("presetSeg").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-preset]");
+  if (b) applyPreset(b.getAttribute("data-preset"));
+});
+
+function bindRange(id, key, out, fixed){
+  var el = document.getElementById(id);
+  el.addEventListener("input", function(){
+    var v = Number(el.value);
+    opts[key] = v;
+    document.getElementById(out).textContent = fixed===undefined ? String(v) : v.toFixed(fixed);
+    if (key==="cardWidth") rebuildGeometry(); else { readLayout(); computeRadius(); computeTiles(); refreshTileGeometry(); measure(); }
+    wake();
+  });
+}
+function refreshTileGeometry(){
+  /* when curve/radius changes, the strips' bend changes but their boxes do
+     not — cheapest correct thing is to rebuild the strip transforms */
+  build(); measure();
+}
+bindRange("curve","curve","curveV",2);
+bindRange("tilt","tilt","tiltV");
+bindRange("spread","spread","spreadV",2);
+bindRange("gap","gap","gapV");
+bindRange("cw","cardWidth","cwV");
+bindRange("df","depthFade","dfV",2);
+
+document.getElementById("cap").addEventListener("change", function(e){
+  opts.captions = e.target.checked;
+  capEl.style.display = opts.captions ? "" : "none";
+  measure(); wake();
+});
+document.getElementById("auto").addEventListener("change", function(e){
+  opts.autoplay = e.target.checked ? "drift" : "off";
+  state.target = null; wake();
+});
+
+/* ======================= boot ======================= */
+function boot(){
+  /* preload the art, then show — the component does the same and it is what
+     keeps the intro from playing over empty frames */
+  var sources = ITEMS.map(function(i){ return i.src; });
+  var load = function(src){
+    return new Promise(function(resolve){
+      var im = new Image();
+      im.decoding = "async";
+      im.onload = function(){ im.decode ? im.decode().then(resolve, resolve) : resolve(); };
+      im.onerror = resolve;
+      im.src = src;
+    });
+  };
+  var timeout = new Promise(function(r){ setTimeout(r, 2400); });
+  Promise.race([ Promise.all(sources.map(load)), timeout ]).then(function(){
+    state.introDone = false; state.intro = null;
+    ready = true;
+    root.setAttribute("data-ready","");
+    wake();
+  });
+}
+
+readLayout();
+computeRadius();
+computeTiles();
+build();
+measure();
+setActive(0);
+if (!opts.captions) capEl.style.display = "none";
+syncControls();
+render(performance.now());
+wake();
+boot();
+
+/* expose for the harness */
+window.__cc = { opts:opts, state:state, rebuild:rebuildGeometry, applyPreset:applyPreset,
+                get radius(){return radius}, get cards(){return cards} };
+})();
+</script>
+</body>
+</html>
