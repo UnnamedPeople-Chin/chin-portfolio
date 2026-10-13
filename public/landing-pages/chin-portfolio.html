@@ -1997,6 +1997,13 @@
         outline:none;
         cursor:grab;
       }
+      /* On a phone the ring is width-limited, so the default clamp leaves a
+         lot of dead height below the cards. Trim it: the stage is scaled to
+         fit, so a shorter host never clips the ring — it just stops gaping.
+         Cards stay the same size; the index line moves up to meet them. */
+      @media(max-width:680px){
+        .circular-carousel{height:clamp(230px,42vw,300px)}
+      }
       .circular-carousel,
       .circular-carousel *{
         -webkit-user-select:none;
@@ -2203,18 +2210,21 @@
         .circular-carousel__title{animation:none}
       }
       @media(max-width:680px){
-        /* No ring on a phone: the fan is cramped, so fall back to the row
-           list, exactly as the section did before. */
+        /* Phone, no ring (reduced motion / no JS): the fan is cramped here, so
+           the row list stands in. */
         html:not(.cc-live) .bc-wrap{display:none}
         html:not(.cc-live) .contact-list{display:block}
       }
       @media(min-width:681px){
         .contact-list{display:none}
       }
-      /* On phones the ring never mounts and the BounceCards fan is hidden, so
-         this list stands in for them: the rows lift in as the section
-         arrives. `.scroll-reveal` is inert on desktop (the list is
-         display:none ≥681px), so this costs nothing there. */
+      /* The ring now mounts on phones too, so the list needs a rule for the
+         live case at every width — otherwise it keeps its default `ul` display
+         and doubles the section under the ring. */
+      html.cc-live .contact-list{display:none}
+      /* When the ring cannot mount (reduced motion / no JS) on a phone, the
+         list stands in for it: the rows lift in as the section arrives.
+         `.scroll-reveal` is inert whenever the list is `display:none`. */
       @media(max-width:680px){
         .js .contact-list li.scroll-reveal{
           transform:translateY(38px);
@@ -8900,10 +8910,11 @@
         if (!wrap || !host) return;
         if (window.REDUCED) return;
         if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        /* On a phone the ring is cramped and the section already has a better
-           fallback — the contact rows. Same breakpoint as the CSS. */
-        var narrow = matchMedia("(max-width: 680px)");
-        if (narrow.matches) return;
+        /* The ring mounts at every width, phones included. It was gated at
+           680px because the *fan* is cramped on a phone — but the ring is a
+           circle, so it uses a narrow screen far better than the fan does,
+           and the measured fit keeps it inside the host. Reduced motion is
+           the only remaining gate; it keeps the contact rows below. */
 
         var cardEls = Array.prototype.slice.call(
           wrap.querySelectorAll(".bc-card"),
@@ -9807,22 +9818,9 @@
             wake();
           });
 
-          /* Resizing across the phone breakpoint swaps the presentation: a
-             desktop window dragged narrow hands back to the contact rows, and
-             a phone window widened gets the ring. Reloading is the clean way —
-             the ring is built from live measurements and the fan is mid-tween
-             by then — so just reload when the answer to "is this a phone?"
-             actually changes. */
-          var onNarrowChange = function () {
-            if (
-              narrow.matches ===
-              document.documentElement.classList.contains("cc-live")
-            ) {
-              location.reload();
-            }
-          };
-          if (narrow.addEventListener) narrow.addEventListener("change", onNarrowChange);
-          else if (narrow.addListener) narrow.addListener(onNarrowChange);
+          /* No breakpoint swap to listen for any more: the ring now mounts at
+             every width, so there is nothing to hand back to the fan. The
+             ResizeObserver above already re-measures when the host changes. */
 
           /* Test seam: the headless harness drives the ring through this. */
           window.__contactRing = {
