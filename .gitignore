@@ -6,5 +6,10 @@ dist/
 .claude/
 graphify-out/
 _arsip-gambar/
+shots/
+__pycache__/
+*.pyc
 *.zip
 *.bak
+tools/motion-schedule-organizer.html
+tools/schedule-organizer-icon.png
