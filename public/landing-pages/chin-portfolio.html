@@ -7135,10 +7135,19 @@
              back to the spread that is still on screen behind it. */
           setActiveAccent(turn ? turn.to : idx);
 
-          // Return focus to whatever opened the dialog.
-          if (modalLastFocused && modalLastFocused.focus) {
-            modalLastFocused.focus();
+          /* Return focus only after the modal background is no longer inert.
+             Calling focus() while the opener is still inside an inert page is
+             ignored by browsers, which otherwise leaves focus stranded on the
+             closing control until the dialog disappears. */
+          function restoreModalFocus() {
+            const opener = modalLastFocused;
             modalLastFocused = null;
+            if (!opener || !opener.isConnected || !opener.focus) return;
+            try {
+              opener.focus({ preventScroll: true });
+            } catch (e) {
+              try { opener.focus(); } catch (ignored) {}
+            }
           }
 
           if (typeof gsap !== "undefined") {
@@ -7163,6 +7172,7 @@
                 modalBackdrop.setAttribute("aria-hidden", "true");
                 lockPageScroll(false);
                 setModalBackgroundInert(false);
+                restoreModalFocus();
                 gsap.set(modal, { rotation: 0, clearProps: "transform" });
               },
             });
@@ -7171,6 +7181,7 @@
             modalBackdrop.setAttribute("aria-hidden", "true");
             lockPageScroll(false);
             setModalBackgroundInert(false);
+            restoreModalFocus();
           }
         }
 

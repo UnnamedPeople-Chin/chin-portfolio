@@ -13,3 +13,5 @@ __pycache__/
 *.bak
 tools/motion-schedule-organizer.html
 tools/schedule-organizer-icon.png
+.tmp-enc/
+opencode.jsonc
