@@ -15,3 +15,10 @@ tools/motion-schedule-organizer.html
 tools/schedule-organizer-icon.png
 .tmp-enc/
 opencode.jsonc
+
+# animate: reference media stays local (new-style.md)
+references/
+pieces/*/frames/
+pieces/*/renders/
+# render output stays local; deliverables are copied to public/ explicitly
+pieces/*/out/
