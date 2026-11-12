@@ -22,3 +22,6 @@ pieces/*/frames/
 pieces/*/renders/
 # render output stays local; deliverables are copied to public/ explicitly
 pieces/*/out/
+
+# film footage: kept outside the repo, copied back only for a Remotion render
+public/plates/

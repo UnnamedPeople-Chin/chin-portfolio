@@ -207,11 +207,12 @@ pastikan `media-src 'self'` masih cukup (tidak perlu diubah kalau file self-host
   `moneyflow-promo-poster.webp` dan `schedule-organizer-video-poster.webp`.
   Lainnya: font (`instrument-serif*.woff2`), favicon + `site.webmanifest`, `backsound.mp3`,
   `og-image.jpg` (1200×630), `portrait-intro.webp`, partikel/ornamen webp, `engraved/*`.
-- `public/plates/` — **untracked, tidak ikut `dist/`.** 4 mp4 footage film (75 MB total):
-  `app-panel.mp4`, `app-panel-crop.mp4`, `app-skeleton.mp4`, `app-take.mp4`. Ada di `public/`
-  karena Remotion me-resolve `plates/*.mp4` relatif ke folder itu (`film/src/plan.js`), bukan
-  karena situs memakainya — plugin di `vite.config.ts` menghapusnya di `writeBundle`.
-  Tanpa itu, `dist/` jadi 95 MB (dari 21 MB).
+- `public/plates/` — **tidak ada di repo.** 4 mp4 footage film (75 MB): `app-panel.mp4`,
+  `app-panel-crop.mp4`, `app-skeleton.mp4`, `app-take.mp4`. Disimpan di
+  `D:\Project\chin-portfolio-workstreams\public\plates\`. Kalau film mau di-render ulang,
+  salin balik ke `public/plates/` — Remotion me-resolve `plates/*.mp4` relatif ke folder itu
+  (`film/src/plan.js`), dan `.gitignore` sudah menutup path tersebut. Plugin di `vite.config.ts`
+  menghapusnya dari `dist/`; tanpa itu build jadi 95 MB (dari 21 MB).
 - `public/landing-pages/chin-portfolio.html` — situsnya.
 - `/assets/*` di produksi maksudnya folder `dist/assets/` hasil build Vite (header cache
   `immutable`). Ini **bukan** folder yang ada di repo.
@@ -230,28 +231,31 @@ OG canonical `https://www.jizdanyr.my.id/`, `og-image.jpg` 1200×630.
 
 ---
 
-## 8. Workstream yang belum di-commit
+## 8. Workstream di luar repo
 
-Direktori ini ada di working tree tapi **belum di-track** dan tidak boleh ikut ke commit
-kecuali user memintanya secara eksplisit:
+Semua kerjaan besar dipindah ke `D:\Project\chin-portfolio-workstreams\` supaya `git status`
+bersih dan tidak ada yang kebawa `git add`. Bukan dihapus — pindah. Ukuran total ±503 MB.
 
-| Path | Isi | Status |
-|---|---|---|
-| `film/` | 303 file — film AetherCast 30 detik (`final.mp4` + `out/v53.mp4`; versi lama dihapus) | kerjaan aktif |
-| `pieces/moneyflow-promo/` | promo 60 detik MoneyFlow Pro — baca `NOTE.md` dulu | selesai, terpasang di situs |
-| `pieces/aethercast-promo/` | 17 file (frames/renders/shots sudah dibersihkan) | eksperimen |
-| `styles/aether/` | 1 file | eksperimen |
-| `unslop/` | 7 file — screenshot before/after + `original.html` | arsip audit UI |
-| `tools/film-shoot/` | 16 file — `camtest.cjs`, `gates.py`, `inject*.cjs`, `measure.cjs` | harness film |
-| `tools/animation-styles/` | `reference-styles.md` | catatan referensi |
-| `public/plates/` | 4 mp4 — footage sumber film, tidak ikut `dist/` | bahan film |
+| Path (di bawah workstreams/) | Isi |
+|---|---|
+| `film/` | 303 file — film AetherCast 30 detik (`final.mp4`, `out/v53.mp4`, `look13/`) |
+| `pieces/moneyflow-promo/` | promo 60 detik MoneyFlow Pro — baca `NOTE.md` dulu |
+| `pieces/aethercast-promo/` | 17 file |
+| `discode-promo/` | 60 MB — aset + `discode-promo.mp4` |
+| `unslop/` | arsip audit UI (screenshot before/after + `original.html`) |
+| `styles/`, `tools/film-shoot/`, `tools/animation-styles/` | eksperimen + harness film |
+| `public/plates/` | 4 mp4 footage film — salin balik ke `public/plates/` untuk render film |
 
-Perubahan `.gitignore` yang belum di-commit menambahkan: `references/`, `pieces/*/frames/`,
-`pieces/*/renders/`. `shots/` dan cache Python sudah diabaikan lewat commit `3bb1aec`.
+Dua deliverable yang **tetap di repo**: `public/chin-portfolio/moneyflow-promo.mp4` +
+posternya (aset situs, sudah di-commit). Master 1080p-nya ada di
+`workstreams/pieces/moneyflow-promo/out/moneyflow-pro-final.mp4`.
+
+Perubahan `.gitignore` (sudah di-commit) menambahkan: `references/`, `pieces/*/frames/`,
+`pieces/*/renders/`, `pieces/*/out/`. `shots/` dan cache Python diabaikan lewat commit `3bb1aec`.
 
 ### `film/` — film produk AetherCast
 
-Baca [film/NOTE.md](film/NOTE.md) sebelum menyentuh apa pun di situ. Ringkasnya:
+Baca `NOTE.md` di `workstreams/film/` sebelum menyentuh apa pun di situ. Ringkasnya:
 
 - Deliverable: `film/final.mp4` (salinan dari `film/out/v53.mp4`).
 - 1920×1080, 30 fps, 900 frame. Remotion + Playwright (dev-only deps).

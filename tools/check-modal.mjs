@@ -13,10 +13,16 @@ import { chromium } from 'playwright'
 
 const PORT = 5199
 const URL = `http://localhost:${PORT}/?nointro`
-const server = spawn(`npx vite --port ${PORT} --strictPort`, { shell: true, stdio: 'ignore' })
+// Spawn Vite's entry with node directly: going through `npx` inserts a cmd.exe
+// that survives server.kill(), and the orphan held the repo open (moves failed
+// with EPERM until it was killed by hand).
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' })
 
 const fail = (m) => { console.error('check:modal failed — ' + m); cleanup(1) }
-function cleanup(code) { try { server.kill() } catch {} process.exit(code) }
+function cleanup(code) {
+  server.kill()
+  setTimeout(() => process.exit(code), 150)   // let the child die before exit
+}
 
 const up = async () => {
   for (let i = 0; i < 60; i++) {
