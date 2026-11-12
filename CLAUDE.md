@@ -23,11 +23,12 @@ Sebelum mengedit, cari dulu section-nya (lihat peta section di §5), jangan mene
 `index.html` di root **hanya untuk dev server.** Isinya cuma
 `<script>location.replace('/landing-pages/chin-portfolio.html')</script>` plus fallback `<noscript>`.
 
-Plugin `serve-portfolio-at-root` di [vite.config.ts](vite.config.ts) melakukan tiga hal:
+Plugin `serve-portfolio-at-root` di [vite.config.ts](vite.config.ts) melakukan empat hal:
 
 1. `configureServer` — rewrite request `/` dan `/index.html` ke `/landing-pages/chin-portfolio.html`.
 2. `generateBundle` — `delete bundle['index.html']`.
 3. `writeBundle` — hapus `dist/index.html` kalau html plugin tetap menulisnya ke disk.
+4. `writeBundle` — hapus `dist/plates/` (75 MB footage film yang cuma dibutuhkan Remotion).
 
 **Kenapa harus dihapus:** kalau ada file statis di `/` dalam `dist/`, ia akan menutupi rewrite
 `/` → `/landing-pages/chin-portfolio.html` di `vercel.json`, dan setiap pengunjung dipaksa lewat
@@ -62,11 +63,15 @@ default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net h
 
 ```bash
 npm run dev       # vite dev server, port 5173, host terbuka (bisa diakses dari HP di LAN)
-npm run build     # vite build -> dist/ (tanpa index.html)
+npm run build     # vite build -> dist/ (tanpa index.html, tanpa plates/)
 npm run preview   # serve dist/ lokal
+npm run check     # build + assert dist/: index.html absen, plates/ absen, aset video ada
+npm run check:modal  # playwright: modal MoneyFlow Pro di viewport 390px, facade -> <video>
 ```
 
-Tidak ada test runner, tidak ada linter, tidak ada CI.
+Tidak ada linter dan tidak ada CI. Dua skrip `check` di atas adalah satu-satunya gerbang otomatis,
+dan keduanya menguji hal yang gagal secara diam-diam: file statis di `/` yang menutupi rewrite,
+dan modal yang tidak pernah menukar facade jadi player.
 
 ---
 
@@ -179,11 +184,11 @@ Ada **dua bentuk** `video:` yang didukung modal:
 //    supaya tidak ada koneksi ke YouTube saat load awal.
 video: { youtubeId: "DsPyzpgbho8", poster: "/chin-portfolio/starwars-ar-video-poster.webp" }
 
-// 2. Video self-hosted — dipakai Schedule Organizer.
+// 2. Video self-hosted — dipakai MoneyFlow Pro dan Schedule Organizer.
 video: {
-  src:    "/chin-portfolio/schedule-organizer-demo.mp4",
-  poster: "/chin-portfolio/schedule-organizer-video-poster.webp",
-  duration: "0:30"
+  src:    "/chin-portfolio/moneyflow-promo.mp4",
+  poster: "/chin-portfolio/moneyflow-promo-poster.webp",
+  duration: "1:00"
 }
 ```
 
@@ -197,12 +202,16 @@ pastikan `media-src 'self'` masih cukup (tidak perlu diubah kalau file self-host
 
 `public/` disalin apa adanya ke `dist/`. Nama folder di `public/` = nama path di produksi.
 
-- `public/chin-portfolio/` — **66 aset.** Per proyek: `*-480.webp`, `*-800.webp`, `*-modal.webp`.
-  Lainnya: `schedule-organizer-demo.mp4`, `schedule-organizer-video-poster.webp`, font
-  (`instrument-serif*.woff2`), favicon + `site.webmanifest`, `backsound.mp3`, `og-image.jpg`
-  (1200×630), `portrait-intro.webp`, partikel/ornamen webp, `engraved/*`.
-- `public/plates/` — **untracked.** 4 mp4 untuk keperluan film: `app-panel.mp4`,
-  `app-panel-crop.mp4`, `app-skeleton.mp4`, `app-take.mp4`.
+- `public/chin-portfolio/` — **68 file.** Per proyek: `*-480.webp`, `*-800.webp`, `*-modal.webp`.
+  Video: `schedule-organizer-demo.mp4` (7,3 MB) dan `moneyflow-promo.mp4` (6,0 MB, 720p) +
+  `moneyflow-promo-poster.webp` dan `schedule-organizer-video-poster.webp`.
+  Lainnya: font (`instrument-serif*.woff2`), favicon + `site.webmanifest`, `backsound.mp3`,
+  `og-image.jpg` (1200×630), `portrait-intro.webp`, partikel/ornamen webp, `engraved/*`.
+- `public/plates/` — **untracked, tidak ikut `dist/`.** 4 mp4 footage film (75 MB total):
+  `app-panel.mp4`, `app-panel-crop.mp4`, `app-skeleton.mp4`, `app-take.mp4`. Ada di `public/`
+  karena Remotion me-resolve `plates/*.mp4` relatif ke folder itu (`film/src/plan.js`), bukan
+  karena situs memakainya — plugin di `vite.config.ts` menghapusnya di `writeBundle`.
+  Tanpa itu, `dist/` jadi 95 MB (dari 21 MB).
 - `public/landing-pages/chin-portfolio.html` — situsnya.
 - `/assets/*` di produksi maksudnya folder `dist/assets/` hasil build Vite (header cache
   `immutable`). Ini **bukan** folder yang ada di repo.
@@ -228,13 +237,14 @@ kecuali user memintanya secara eksplisit:
 
 | Path | Isi | Status |
 |---|---|---|
-| `film/` | 343 file — film AetherCast 30 detik | kerjaan aktif |
-| `pieces/aethercast-promo/` | 6 file | eksperimen |
+| `film/` | 303 file — film AetherCast 30 detik (`final.mp4` + `out/v53.mp4`; versi lama dihapus) | kerjaan aktif |
+| `pieces/moneyflow-promo/` | promo 60 detik MoneyFlow Pro — baca `NOTE.md` dulu | selesai, terpasang di situs |
+| `pieces/aethercast-promo/` | 17 file (frames/renders/shots sudah dibersihkan) | eksperimen |
 | `styles/aether/` | 1 file | eksperimen |
 | `unslop/` | 7 file — screenshot before/after + `original.html` | arsip audit UI |
 | `tools/film-shoot/` | 16 file — `camtest.cjs`, `gates.py`, `inject*.cjs`, `measure.cjs` | harness film |
 | `tools/animation-styles/` | `reference-styles.md` | catatan referensi |
-| `public/plates/` | 4 mp4 | bahan film |
+| `public/plates/` | 4 mp4 — footage sumber film, tidak ikut `dist/` | bahan film |
 
 Perubahan `.gitignore` yang belum di-commit menambahkan: `references/`, `pieces/*/frames/`,
 `pieces/*/renders/`. `shots/` dan cache Python sudah diabaikan lewat commit `3bb1aec`.
@@ -285,6 +295,6 @@ dan `playwright` masih uncommitted.
 4. **Host/CDN baru** → update CSP di `vercel.json`, kalau tidak akan diblokir diam-diam di prod.
 5. **Token warna** → pakai `--accent`/`--ink-soft-text`/`--earth-text`; jangan hardcode, jangan
    pakai `--ink-faint` untuk teks.
-6. **Verifikasi di dev server** (`http://localhost:5173/`), lalu `npm run build` dan pastikan
-   `dist/index.html` **tidak ada** sebelum menganggap build benar.
+6. **Verifikasi** — `npm run check` (build + assert `dist/`), `npm run check:modal` (modal video
+   di viewport HP). Kalau mengubah shot atau aset, cek manual juga di `http://localhost:5173/`.
 7. **Commit** dengan pesan bergaya user, tanpa atribusi, stage per path.
